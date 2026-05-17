@@ -40,6 +40,14 @@ echo "==> Preparing system..."
 apt-get update -y
 apt-get install -y curl wget tar unzip python3 python3-pip python3-venv adduser libfontconfig1 apt-transport-https software-properties-common
 
+# Install Python 3.12 — the default Python 3.14 on this Ubuntu version is too new
+# for the protobuf library required by OpenTelemetry
+if ! command -v python3.12 &>/dev/null; then
+  add-apt-repository -y ppa:deadsnakes/ppa
+  apt-get update -y
+  apt-get install -y python3.12 python3.12-venv python3.12-dev
+fi
+
 # Add Grafana apt repository and install grafana=10.4.2
 if ! dpkg -l | grep -q "^ii  grafana "; then
   wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor > /usr/share/keyrings/grafana.gpg
@@ -239,9 +247,11 @@ echo "==> Installing demo service..."
 cp "${REPO_DIR}/demo-service/app.py"           /opt/demo-service/
 cp "${REPO_DIR}/demo-service/requirements.txt" /opt/demo-service/
 
-# Only create venv if it doesn't already exist (idempotent)
-if [ ! -d /opt/demo-service/venv ]; then
-  python3 -m venv /opt/demo-service/venv
+# Use Python 3.12 for the venv — Python 3.14 is incompatible with protobuf/OTel
+# Only recreate if venv doesn't exist or was built with wrong Python
+if [ ! -d /opt/demo-service/venv ] || ! /opt/demo-service/venv/bin/python --version 2>&1 | grep -q "3.12"; then
+  rm -rf /opt/demo-service/venv
+  python3.12 -m venv /opt/demo-service/venv
 fi
 /opt/demo-service/venv/bin/pip install --quiet -r /opt/demo-service/requirements.txt
 

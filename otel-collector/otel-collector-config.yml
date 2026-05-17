@@ -42,10 +42,6 @@ exporters:
       job: true
       instance: false
       level: true
-    labels:
-      resource_labels:
-        - service.name
-        - deployment.environment
 
   # ── OTel Collector internal metrics → Prometheus scrape endpoint ─────────────
   prometheus:
