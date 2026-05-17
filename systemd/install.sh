@@ -30,8 +30,8 @@ apt-get install -y curl wget tar unzip python3 python3-pip python3-venv adduser 
 
 # Add Grafana apt repository and install grafana=10.4.2
 if ! dpkg -l | grep -q grafana; then
-  wget -q -O /usr/share/keyrings/grafana.key https://apt.grafana.com/gpg.key
-  echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main" | tee /etc/apt/sources.list.d/grafana.list
+  wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor > /usr/share/keyrings/grafana.gpg
+  echo "deb [signed-by=/usr/share/keyrings/grafana.gpg] https://apt.grafana.com stable main" | tee /etc/apt/sources.list.d/grafana.list
   apt-get update -y
   apt-get install -y grafana=10.4.2
 fi
