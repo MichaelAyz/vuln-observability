@@ -1,0 +1,3 @@
+{
+  "__comment": "unified_observability.json — Metric spike → Loki log correlation → Tempo trace drill-down. Derived fields for clickable trace IDs. Populated in Phase 7."
+}

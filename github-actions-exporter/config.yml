@@ -1,0 +1,75 @@
+# ============================================================================
+# github-actions-exporter/config.yml
+#
+# DOCUMENTATION REFERENCE — this exporter is configured entirely via
+# environment variables in docker-compose.yml. This file exists as a
+# single source of truth for what those variables do and what metrics
+# are produced.
+#
+# ⚠️  SECURITY: The real GitHub PAT is injected at runtime via the
+# GITHUB_PAT environment variable. It must NEVER be committed to this
+# repository. The docker-compose.yml reads it from the host environment:
+#
+#   environment:
+#     - GITHUB_TOKEN=${GITHUB_PAT:-placeholder_token}
+#
+# Set it on the VM before running docker compose up:
+#   export GITHUB_PAT="ghp_your_real_token_here"
+#   docker compose up -d
+# ============================================================================
+
+# ── Environment Variables ────────────────────────────────────────────────────
+#
+# GITHUB_TOKEN (required)
+#   A GitHub Personal Access Token with the following scopes:
+#     - repo        (read access to repository metadata and workflow runs)
+#     - workflow    (read access to Actions workflow runs and job steps)
+#   Map to: GITHUB_PAT environment variable on the host
+#   Injected in docker-compose.yml as: GITHUB_TOKEN=${GITHUB_PAT:-placeholder_token}
+#
+# GITHUB_REPOSITORY (required)
+#   The repository to scrape in org/repo format.
+#   Value: hngprojects/vulnwatch-ui
+#   Injected in docker-compose.yml as: GITHUB_REPOSITORY=hngprojects/vulnwatch-ui
+#
+# ── Scrape Endpoint ──────────────────────────────────────────────────────────
+#
+# http://github-actions-exporter:9999/metrics
+# Scraped by Prometheus at 60-second intervals (GitHub API rate limit buffer).
+# Configured in prometheus/prometheus.yml under job_name: "github-actions-exporter"
+#
+# ── Metrics Exposed ──────────────────────────────────────────────────────────
+#
+# github_workflow_run_status
+#   Labels: repo, workflow, branch, event, status
+#   Values: 0 = queued, 1 = in_progress, 2 = completed
+#   Used for: Deployment Frequency, Change Failure Rate (CFR)
+#
+# github_workflow_run_duration_ms
+#   Labels: repo, workflow, branch, status
+#   Value: duration in milliseconds
+#   Used for: Lead Time for Changes (LTC)
+#
+# github_workflow_run_conclusion
+#   Labels: repo, workflow, branch, conclusion
+#   Values: success=1, failure=1, cancelled=1 (one series per conclusion)
+#   Used for: Change Failure Rate (CFR) — failure / total
+#
+# github_job_run_duration_ms
+#   Labels: repo, workflow, job, status
+#   Used for: Lead Time sub-interval breakdown (commit → pipeline complete)
+#
+# ── DORA Metric Derivations (Phase 9) ────────────────────────────────────────
+#
+# Deployment Frequency:
+#   count_over_time(github_workflow_run_status{conclusion="success",workflow="deploy"}[1d])
+#
+# Lead Time for Changes:
+#   avg(github_workflow_run_duration_ms{workflow="deploy",conclusion="success"}) / 1000
+#
+# Change Failure Rate:
+#   rate(github_workflow_run_conclusion{conclusion="failure"}[7d])
+#     / rate(github_workflow_run_status{status="completed"}[7d])
+#
+# MTTR: Derived from Alertmanager firing → resolved timestamps (Phase 9)
+# ============================================================================

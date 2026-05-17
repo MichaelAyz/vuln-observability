@@ -1,0 +1,16 @@
+# SLO Burn Rate Alert Rules
+# Validated with: promtool check rules slo_burn_rate.yml
+
+
+groups:
+  - name: slo_burn_rate.placeholder
+    rules:
+      - alert: PlaceholderSLOBurnRate
+        expr: vector(0)
+        for: 1m
+        labels:
+          severity: none
+        annotations:
+          summary: "Placeholder — wired in Phase 6"
+          description: "This rule is replaced in Phase 6 with real SLO burn rate alerts."
+          runbook_url: "https://github.com/hngprojects/vuln-observability/blob/main/runbooks/slo_fast_burn.md"

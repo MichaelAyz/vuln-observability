@@ -1,0 +1,15 @@
+# Infrastructure Alert Rules
+# Validated with: promtool check rules infrastructure.yml
+
+groups:
+  - name: infrastructure.placeholder
+    rules:
+      - alert: PlaceholderInfrastructure
+        expr: vector(0)
+        for: 1m
+        labels:
+          severity: none
+        annotations:
+          summary: "Placeholder — wired in Phase 6"
+          description: "This rule is replaced in Phase 6 with real infrastructure alerts."
+          runbook_url: "https://github.com/hngprojects/vuln-observability/blob/main/runbooks/cpu_warning.md"

@@ -1,0 +1,69 @@
+apiVersion: 1
+
+datasources:
+
+  # ── Prometheus ──────────────────────────────────────────────────────────────
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    url: http://prometheus:9090
+    access: proxy
+    isDefault: true
+    editable: false
+    version: 1
+    jsonData:
+      timeInterval: "15s"
+      httpMethod: POST
+
+  # ── Loki ────────────────────────────────────────────────────────────────────
+  - name: Loki
+    type: loki
+    uid: loki
+    url: http://loki:3100
+    access: proxy
+    editable: false
+    version: 1
+    jsonData:
+      maxLines: 1000
+      derivedFields:
+        # Extract trace ID from log lines and link directly into Tempo
+        - name: TraceID
+          matcherRegex: 'traceId=(\w+)'
+          url: "${__value.raw}"
+          datasourceUid: tempo
+          urlDisplayLabel: "View Trace in Tempo"
+
+  # ── Tempo ────────────────────────────────────────────────────────────────────
+  - name: Tempo
+    type: tempo
+    uid: tempo
+    url: http://tempo:3200
+    access: proxy
+    editable: false
+    version: 1
+    jsonData:
+      # Trace-to-logs correlation: open Loki from a trace span
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: "-1h"
+        spanEndTimeShift: "1h"
+        filterByTraceID: true
+        filterBySpanID: false
+        customQuery: false
+      # Trace-to-metrics correlation
+      tracesToMetrics:
+        datasourceUid: prometheus
+        spanStartTimeShift: "-1h"
+        spanEndTimeShift: "1h"
+      # Service map from Prometheus (populated by Tempo metrics_generator)
+      serviceMap:
+        datasourceUid: prometheus
+      # Search backend
+      search:
+        hide: false
+      # Node graph visualisation
+      nodeGraph:
+        enabled: true
+      # Loki log search from Tempo
+      lokiSearch:
+        datasourceUid: loki

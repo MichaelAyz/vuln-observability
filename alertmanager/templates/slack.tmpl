@@ -1,0 +1,58 @@
+{{/*
+  ============================================================================
+  slack.tmpl — Structured Alertmanager Slack notification templates
+  Used by: alertmanager/alertmanager.yml receivers[].slack_configs
+  Templates defined: slack.vuln.title | slack.vuln.color | slack.vuln.text
+  ============================================================================
+*/}}
+
+
+{{/* ── Title ─────────────────────────────────────────────────────────────── */}}
+{{ define "slack.vuln.title" -}}
+  {{- if eq .Status "firing" -}}
+    [FIRING 🔴] {{ .CommonLabels.alertname }}
+    {{- with .Alerts.Firing }} ({{ len . }} alert{{ if gt (len .) 1 }}s{{ end }}){{ end }}
+  {{- else -}}
+    [RESOLVED 🟢] {{ .CommonLabels.alertname }}
+  {{- end -}}
+{{ end }}
+
+
+{{/* ── Color ──────────────────────────────────────────────────────────────── */}}
+{{ define "slack.vuln.color" -}}
+  {{- if eq .Status "resolved" -}}
+    good
+  {{- else if eq .CommonLabels.severity "critical" -}}
+    danger
+  {{- else -}}
+    warning
+  {{- end -}}
+{{ end }}
+
+
+{{/* ── Body Text ───────────────────────────────────────────────────────────── */}}
+{{ define "slack.vuln.text" -}}
+  {{- range $i, $alert := .Alerts }}
+    {{- if gt $i 0 }}
+─────────────────────────────────────────
+    {{- end }}
+
+*Severity:*  {{ if eq $alert.Labels.severity "critical" -}}
+               🔴 CRITICAL
+             {{- else if eq $alert.Labels.severity "warning" -}}
+               🟡 WARNING
+             {{- else -}}
+               ℹ️  {{ $alert.Labels.severity | toUpper }}
+             {{- end }}
+*Host:*      {{ $alert.Labels.instance | default "N/A" }}
+*Summary:*   {{ $alert.Annotations.summary | default "No summary provided" }}
+*Details:*   {{ $alert.Annotations.description | default "No description provided" }}
+*Firing for:* {{ $alert.StartsAt | since }}
+    {{- if $alert.Annotations.runbook_url }}
+*Runbook:*   <{{ $alert.Annotations.runbook_url }}|📖 View Runbook>
+    {{- end }}
+    {{- if $alert.Labels.grafana_url }}
+*Dashboard:* <{{ $alert.Labels.grafana_url }}|📊 Open in Grafana>
+    {{- end }}
+  {{- end }}
+{{ end }}

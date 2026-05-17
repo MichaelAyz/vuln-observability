@@ -1,0 +1,80 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # ── Memory guard — always first in every pipeline ──────────────────────────
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+
+  # ── Batch for throughput efficiency ────────────────────────────────────────
+  batch:
+    timeout: 5s
+    send_batch_size: 1000
+
+  # ── Ensure required resource attributes exist on all log records ───────────
+  resource:
+    attributes:
+      - action: upsert
+        key: service.name
+        value: vuln-watch-demo
+      - action: upsert
+        key: deployment.environment
+        value: production
+
+exporters:
+  # ── Traces → Tempo (OTLP gRPC) ─────────────────────────────────────────────
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+  # ── Logs → Loki ─────────────────────────────────────────────────────────────
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
+    default_labels_enabled:
+      exporter: false
+      job: true
+      instance: false
+      level: true
+    labels:
+      resource_labels:
+        - service.name
+        - deployment.environment
+
+  # ── OTel Collector internal metrics → Prometheus scrape endpoint ─────────────
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: otelcol
+
+service:
+  pipelines:
+
+    # Traces: demo-service → OTel Collector → Tempo
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/tempo]
+
+    # Logs: demo-service → OTel Collector → Loki
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [loki]
+
+    # Metrics: demo-service → OTel Collector → Prometheus scrape endpoint
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
+
+  telemetry:
+    logs:
+      level: "info"
+    metrics:
+      address: 0.0.0.0:8888

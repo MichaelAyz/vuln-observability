@@ -1,0 +1,16 @@
+# CI/CD & DORA Alert Rules
+# Validated with: promtool check rules cicd.yml
+# All rules wired in Phase 6
+
+groups:
+  - name: cicd.placeholder
+    rules:
+      - alert: PlaceholderCICD
+        expr: vector(0)
+        for: 1m
+        labels:
+          severity: none
+        annotations:
+          summary: "Placeholder — wired in Phase 6"
+          description: "This rule is replaced in Phase 6 with real CI/CD alerts."
+          runbook_url: "https://github.com/hngprojects/vuln-observability/blob/main/runbooks/cfr_threshold_exceeded.md"

@@ -1,0 +1,89 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: "vuln-observability"
+    environment: "production"
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load alert rules
+rule_files:
+  - "/etc/prometheus/rules/*.yml"
+
+scrape_configs:
+
+  # Prometheus self-scrape
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # System metrics — Node Exporter
+  - job_name: "node-exporter"
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels:
+          instance: "3.219.30.122"
+          env: "production"
+
+  # HTTP/SSL probing — Blackbox Exporter
+  - job_name: "blackbox-http"
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://vuln-watch.hng14.com
+          - https://staging.vuln-watch.hng14.com
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # SSL certificate expiry probing
+  - job_name: "blackbox-ssl"
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    static_configs:
+      - targets:
+          - vuln-watch.hng14.com:443
+          - staging.vuln-watch.hng14.com:443
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # Blackbox exporter internal metrics
+  - job_name: "blackbox-exporter"
+    static_configs:
+      - targets: ["blackbox-exporter:9115"]
+
+  # DORA metrics — GitHub Actions Exporter
+  - job_name: "github-actions-exporter"
+    scrape_interval: 60s  # GitHub API rate limit consideration
+    static_configs:
+      - targets: ["github-actions-exporter:9999"]
+
+  # OTel Collector internal metrics
+  - job_name: "otel-collector"
+    static_configs:
+      - targets: ["otel-collector:8888"]
+
+  # Demo service metrics
+  - job_name: "demo-service"
+    static_configs:
+      - targets: ["demo-service:8080"]
+    metrics_path: /metrics
