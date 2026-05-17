@@ -129,20 +129,31 @@ fi
 
 # OTel Collector
 if [ ! -f "${INSTALL_DIR}/otelcol-contrib" ]; then
-  wget -q "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v${OTEL_VERSION}/otelcol-contrib_${OTEL_VERSION}_linux_amd64.tar.gz"
-  tar xvf otelcol-contrib_${OTEL_VERSION}_linux_amd64.tar.gz
-  cp otelcol-contrib ${INSTALL_DIR}/
-  chmod 755 ${INSTALL_DIR}/otelcol-contrib
-  rm -rf otelcol-contrib*
+  wget -q "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v${OTEL_VERSION}/otelcol-contrib_${OTEL_VERSION}_linux_amd64.tar.gz" \
+    || { echo "[WARN] Failed to download otelcol-contrib — skipping"; }
+  if [ -f otelcol-contrib_${OTEL_VERSION}_linux_amd64.tar.gz ]; then
+    tar xvf otelcol-contrib_${OTEL_VERSION}_linux_amd64.tar.gz
+    cp otelcol-contrib ${INSTALL_DIR}/
+    chmod 755 ${INSTALL_DIR}/otelcol-contrib
+    rm -rf otelcol-contrib* README.md
+  fi
 fi
 
-# GitHub Actions Exporter
+# GitHub Actions Exporter — wrapped in subshell so a 404 does not abort the install
 if [ ! -f "${INSTALL_DIR}/github-actions-exporter" ]; then
-  wget -q "https://github.com/cpanato/github-actions-exporter/releases/download/v${GH_EXPORTER_VERSION}/github-actions-exporter_${GH_EXPORTER_VERSION}_Linux_x86_64.tar.gz"
-  tar xvf github-actions-exporter_${GH_EXPORTER_VERSION}_Linux_x86_64.tar.gz
-  cp github-actions-exporter ${INSTALL_DIR}/
-  chmod 755 ${INSTALL_DIR}/github-actions-exporter
-  rm -rf github-actions-exporter*
+  (
+    set +e
+    wget -q "https://github.com/cpanato/github-actions-exporter/releases/download/v${GH_EXPORTER_VERSION}/github-actions-exporter_${GH_EXPORTER_VERSION}_Linux_x86_64.tar.gz" \
+      || wget -q "https://github.com/cpanato/github-actions-exporter/releases/download/v${GH_EXPORTER_VERSION}/github-actions-exporter_${GH_EXPORTER_VERSION}_linux_amd64.tar.gz"
+    if [ -f github-actions-exporter_${GH_EXPORTER_VERSION}_Linux_x86_64.tar.gz ] || [ -f github-actions-exporter_${GH_EXPORTER_VERSION}_linux_amd64.tar.gz ]; then
+      tar xvf github-actions-exporter_${GH_EXPORTER_VERSION}_*.tar.gz
+      cp github-actions-exporter ${INSTALL_DIR}/ 2>/dev/null || cp github-actions-exporter_linux_amd64 ${INSTALL_DIR}/github-actions-exporter 2>/dev/null || true
+      chmod 755 ${INSTALL_DIR}/github-actions-exporter 2>/dev/null || true
+      rm -rf github-actions-exporter*
+    else
+      echo "[WARN] github-actions-exporter v${GH_EXPORTER_VERSION} not found — DORA metrics will be unavailable until manually installed"
+    fi
+  )
 fi
 
 cd "$REPO_DIR"
