@@ -66,7 +66,8 @@ mkdir -p /var/log/demo-service
 # Section 4 — Download and install binaries
 # ============================================================================
 echo "==> Downloading and installing binaries..."
-TMP_DIR=$(mktemp -d)
+# Use /var/tmp which is usually backed by disk, not a small RAM tmpfs
+TMP_DIR=$(mktemp -d -p /var/tmp)
 cd "$TMP_DIR"
 
 # Prometheus
@@ -76,6 +77,7 @@ if [ ! -f "${INSTALL_DIR}/prometheus" ]; then
   cp prometheus-${PROMETHEUS_VERSION}.linux-amd64/prometheus ${INSTALL_DIR}/
   cp prometheus-${PROMETHEUS_VERSION}.linux-amd64/promtool ${INSTALL_DIR}/
   chmod 755 ${INSTALL_DIR}/prometheus ${INSTALL_DIR}/promtool
+  rm -rf prometheus-${PROMETHEUS_VERSION}.linux-amd64*
 fi
 
 # Loki
@@ -85,6 +87,7 @@ if [ ! -f "${INSTALL_DIR}/loki" ]; then
   mv loki-linux-amd64 loki
   cp loki ${INSTALL_DIR}/
   chmod 755 ${INSTALL_DIR}/loki
+  rm -rf loki*
 fi
 
 # Tempo
@@ -93,6 +96,7 @@ if [ ! -f "${INSTALL_DIR}/tempo" ]; then
   tar xvf tempo_${TEMPO_VERSION}_linux_amd64.tar.gz
   cp tempo ${INSTALL_DIR}/
   chmod 755 ${INSTALL_DIR}/tempo
+  rm -rf tempo*
 fi
 
 # Node Exporter
@@ -101,6 +105,7 @@ if [ ! -f "${INSTALL_DIR}/node_exporter" ]; then
   tar xvf node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64.tar.gz
   cp node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64/node_exporter ${INSTALL_DIR}/
   chmod 755 ${INSTALL_DIR}/node_exporter
+  rm -rf node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64*
 fi
 
 # Blackbox Exporter
@@ -109,6 +114,7 @@ if [ ! -f "${INSTALL_DIR}/blackbox_exporter" ]; then
   tar xvf blackbox_exporter-${BLACKBOX_VERSION}.linux-amd64.tar.gz
   cp blackbox_exporter-${BLACKBOX_VERSION}.linux-amd64/blackbox_exporter ${INSTALL_DIR}/
   chmod 755 ${INSTALL_DIR}/blackbox_exporter
+  rm -rf blackbox_exporter-${BLACKBOX_VERSION}.linux-amd64*
 fi
 
 # Alertmanager
@@ -118,6 +124,7 @@ if [ ! -f "${INSTALL_DIR}/alertmanager" ]; then
   cp alertmanager-${ALERTMANAGER_VERSION}.linux-amd64/alertmanager ${INSTALL_DIR}/
   cp alertmanager-${ALERTMANAGER_VERSION}.linux-amd64/amtool ${INSTALL_DIR}/
   chmod 755 ${INSTALL_DIR}/alertmanager ${INSTALL_DIR}/amtool
+  rm -rf alertmanager-${ALERTMANAGER_VERSION}.linux-amd64*
 fi
 
 # OTel Collector
@@ -126,6 +133,7 @@ if [ ! -f "${INSTALL_DIR}/otelcol-contrib" ]; then
   tar xvf otelcol-contrib_${OTEL_VERSION}_linux_amd64.tar.gz
   cp otelcol-contrib ${INSTALL_DIR}/
   chmod 755 ${INSTALL_DIR}/otelcol-contrib
+  rm -rf otelcol-contrib*
 fi
 
 # GitHub Actions Exporter
@@ -134,6 +142,7 @@ if [ ! -f "${INSTALL_DIR}/github-actions-exporter" ]; then
   tar xvf github-actions-exporter_${GH_EXPORTER_VERSION}_Linux_x86_64.tar.gz
   cp github-actions-exporter ${INSTALL_DIR}/
   chmod 755 ${INSTALL_DIR}/github-actions-exporter
+  rm -rf github-actions-exporter*
 fi
 
 cd "$REPO_DIR"
