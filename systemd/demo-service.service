@@ -7,7 +7,7 @@ Type=simple
 User=demoservice
 Group=demoservice
 WorkingDirectory=/opt/demo-service
-Environment="OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318"
+Environment="OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4328"
 Environment="OTEL_SERVICE_NAME=vuln-watch-demo"
 Environment="OTEL_RESOURCE_ATTRIBUTES=service.version=1.0.0,deployment.environment=demo"
 ExecStart=/opt/demo-service/venv/bin/python /opt/demo-service/app.py

@@ -229,7 +229,7 @@ chown -R ghexporter:ghexporter /etc/github-actions-exporter
 # ============================================================================
 echo "==> Substituting environment variables..."
 
-# Replace the entire PLACEHOLDER webhook URL (not just the word PLACEHOLDER)
+# Replace the entire placeholder webhook URL with the real one
 sed -i "s|https://hooks.slack.com/services/PLACEHOLDER|${SLACK_WEBHOOK_URL}|g" /etc/alertmanager/alertmanager.yml
 
 # ============================================================================

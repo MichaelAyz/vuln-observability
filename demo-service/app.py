@@ -15,7 +15,7 @@ from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from prometheus_flask_exporter import PrometheusMetrics
 
 # ── Environment ───────────────────────────────────────────────────────────────
-OTLP_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4318")
+OTLP_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4328")
 SERVICE_NAME  = os.getenv("OTEL_SERVICE_NAME", "vuln-watch-demo")
 
 # ── OTel Tracer Setup ─────────────────────────────────────────────────────────

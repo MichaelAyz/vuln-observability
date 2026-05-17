@@ -21,9 +21,9 @@ storage:
   trace:
     backend: local
     local:
-      path: /tmp/tempo/blocks
+      path: /var/lib/tempo/blocks
     wal:
-      path: /tmp/tempo/wal
+      path: /var/lib/tempo/wal
 
 metrics_generator:
   registry:
@@ -31,7 +31,7 @@ metrics_generator:
       source: tempo
       cluster: vuln-observability
   storage:
-    path: /tmp/tempo/generator/wal
+    path: /var/lib/tempo/generator/wal
     remote_write:
       - url: http://localhost:9090/api/v1/write
         send_exemplars: true

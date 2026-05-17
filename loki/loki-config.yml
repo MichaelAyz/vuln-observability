@@ -6,11 +6,11 @@ server:
 
 common:
   instance_addr: 127.0.0.1
-  path_prefix: /loki
+  path_prefix: /var/lib/loki
   storage:
     filesystem:
-      chunks_directory: /loki/chunks
-      rules_directory: /loki/rules
+      chunks_directory: /var/lib/loki/chunks
+      rules_directory: /var/lib/loki/rules
   replication_factor: 1
   ring:
     kvstore:
@@ -43,7 +43,7 @@ limits_config:
   ingestion_burst_size_mb: 32
 
 compactor:
-  working_directory: /loki/boltdb-shipper-compactor
+  working_directory: /var/lib/loki/boltdb-shipper-compactor
   shared_store: filesystem
   retention_enabled: true
   retention_delete_delay: 2h
