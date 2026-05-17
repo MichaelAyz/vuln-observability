@@ -10,7 +10,7 @@ alerting:
   alertmanagers:
     - static_configs:
         - targets:
-            - alertmanager:9093
+            - localhost:9093
 
 # Load alert rules
 rule_files:
@@ -27,7 +27,7 @@ scrape_configs:
   - job_name: "node-exporter"
     scrape_interval: 15s
     static_configs:
-      - targets: ["node-exporter:9100"]
+      - targets: ["localhost:9100"]
         labels:
           instance: "3.219.30.122"
           env: "production"
@@ -47,7 +47,7 @@ scrape_configs:
       - source_labels: [__param_target]
         target_label: instance
       - target_label: __address__
-        replacement: blackbox-exporter:9115
+        replacement: localhost:9115
 
   # SSL certificate expiry probing
   - job_name: "blackbox-ssl"
@@ -64,26 +64,26 @@ scrape_configs:
       - source_labels: [__param_target]
         target_label: instance
       - target_label: __address__
-        replacement: blackbox-exporter:9115
+        replacement: localhost:9115
 
   # Blackbox exporter internal metrics
   - job_name: "blackbox-exporter"
     static_configs:
-      - targets: ["blackbox-exporter:9115"]
+      - targets: ["localhost:9115"]
 
   # DORA metrics — GitHub Actions Exporter
   - job_name: "github-actions-exporter"
     scrape_interval: 60s  # GitHub API rate limit consideration
     static_configs:
-      - targets: ["github-actions-exporter:9999"]
+      - targets: ["localhost:9999"]
 
   # OTel Collector internal metrics
   - job_name: "otel-collector"
     static_configs:
-      - targets: ["otel-collector:8888"]
+      - targets: ["localhost:8888"]
 
   # Demo service metrics
   - job_name: "demo-service"
     static_configs:
-      - targets: ["demo-service:8080"]
+      - targets: ["localhost:8080"]
     metrics_path: /metrics

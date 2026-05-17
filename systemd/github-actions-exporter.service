@@ -1,0 +1,21 @@
+[Unit]
+Description=GitHub Actions Exporter
+Documentation=https://github.com/cpanato/github-actions-exporter
+After=network.target
+
+[Service]
+Type=simple
+User=ghexporter
+Group=ghexporter
+# GITHUB_TOKEN is overridden by install.sh sed substitution — do not hardcode real token here
+Environment="GITHUB_TOKEN=placeholder_token"
+Environment="GITHUB_REPOSITORY=hngprojects/vulnwatch-ui"
+ExecStart=/usr/local/bin/github-actions-exporter
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=github_actions_exporter
+
+[Install]
+WantedBy=multi-user.target

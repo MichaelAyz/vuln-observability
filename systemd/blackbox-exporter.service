@@ -1,0 +1,18 @@
+[Unit]
+Description=Blackbox Exporter
+Documentation=https://github.com/prometheus/blackbox_exporter
+After=network.target
+
+[Service]
+Type=simple
+User=blackbox
+Group=blackbox
+ExecStart=/usr/local/bin/blackbox_exporter --config.file=/etc/blackbox-exporter/config.yml --web.listen-address=0.0.0.0:9115
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=blackbox_exporter
+
+[Install]
+WantedBy=multi-user.target

@@ -1,21 +1,19 @@
 # ============================================================================
 # github-actions-exporter/config.yml
 #
-# DOCUMENTATION REFERENCE — this exporter is configured entirely via
-# environment variables in docker-compose.yml. This file exists as a
+# DOCUMENTATION REFERENCE — this exporter is configured via
+# environment variables in the systemd unit file. This file exists as a
 # single source of truth for what those variables do and what metrics
 # are produced.
 #
 # ⚠️  SECURITY: The real GitHub PAT is injected at runtime via the
-# GITHUB_PAT environment variable. It must NEVER be committed to this
-# repository. The docker-compose.yml reads it from the host environment:
+# GITHUB_PAT environment variable using a sed substitution in the install script.
+# It must NEVER be committed to this repository. The systemd service reads it
+# as an environment variable.
 #
-#   environment:
-#     - GITHUB_TOKEN=${GITHUB_PAT:-placeholder_token}
-#
-# Set it on the VM before running docker compose up:
+# Set it on the VM before running the install script:
 #   export GITHUB_PAT="ghp_your_real_token_here"
-#   docker compose up -d
+#   ./install.sh
 # ============================================================================
 
 # ── Environment Variables ────────────────────────────────────────────────────
@@ -25,12 +23,12 @@
 #     - repo        (read access to repository metadata and workflow runs)
 #     - workflow    (read access to Actions workflow runs and job steps)
 #   Map to: GITHUB_PAT environment variable on the host
-#   Injected in docker-compose.yml as: GITHUB_TOKEN=${GITHUB_PAT:-placeholder_token}
+#   Injected in systemd unit by install.sh substitution
 #
 # GITHUB_REPOSITORY (required)
 #   The repository to scrape in org/repo format.
 #   Value: hngprojects/vulnwatch-ui
-#   Injected in docker-compose.yml as: GITHUB_REPOSITORY=hngprojects/vulnwatch-ui
+#   Hardcoded in systemd unit as: Environment="GITHUB_REPOSITORY=hngprojects/vulnwatch-ui"
 #
 # ── Scrape Endpoint ──────────────────────────────────────────────────────────
 #

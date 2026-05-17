@@ -4,7 +4,7 @@
 # Approach: remote-exec via null_resource
 #   Terraform's built-in file provisioner cannot copy directories recursively,
 #   so we use local-exec to rsync the entire repo to the VM first, then
-#   remote-exec to pull images and bring the stack up with docker compose.
+#   remote-exec to install and configure the stack using systemd.
 #
 # One-command deployment:
 #   terraform init && terraform apply -var="ssh_private_key_path=~/.ssh/your_key"
@@ -44,10 +44,10 @@ terraform {
 # ── Deploy the full observability stack onto the VM ────────────────────────────
 resource "null_resource" "deploy_observability_stack" {
 
-  # Re-run this resource whenever docker-compose.yml changes.
+  # Re-run this resource whenever the install script changes.
   # Add other critical files here to trigger re-deploys on config changes.
   triggers = {
-    compose_hash = filemd5("${path.root}/../docker-compose.yml")
+    install_hash = filemd5("${path.root}/../systemd/install.sh")
   }
 
   # ── Step 1: rsync the repo to the VM ────────────────────────────────────────
@@ -80,9 +80,8 @@ resource "null_resource" "deploy_observability_stack" {
       "cd /home/${var.vm_user}/vuln-observability",
       "export SLACK_WEBHOOK_URL='${var.slack_webhook_url}'",
       "export GITHUB_PAT='${var.github_pat}'",
-      "docker compose pull",
-      "docker compose up -d --remove-orphans",
-      "docker compose ps",
+      "chmod +x install.sh || chmod +x systemd/install.sh",
+      "cd systemd && ./install.sh"
     ]
   }
 }
