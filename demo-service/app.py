@@ -1,7 +1,7 @@
 import os
 import json
 import time
-import threading
+import logging
 from datetime import datetime, timezone
 
 from flask import Flask, jsonify, request, g
@@ -14,27 +14,49 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 from prometheus_flask_exporter import PrometheusMetrics
 
+# OTel Logs SDK — sends structured logs via OTLP to the OTel Collector
+from opentelemetry._logs import set_logger_provider
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+
 # ── Environment ───────────────────────────────────────────────────────────────
 OTLP_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4328")
 SERVICE_NAME  = os.getenv("OTEL_SERVICE_NAME", "vuln-watch-demo")
 
-# ── OTel Tracer Setup ─────────────────────────────────────────────────────────
+# ── OTel Resource (shared by traces and logs) ────────────────────────────────
 resource = Resource.create({RESOURCE_SERVICE_NAME: SERVICE_NAME})
 
-exporter = OTLPSpanExporter(
+# ── OTel Tracer Setup ─────────────────────────────────────────────────────────
+trace_exporter = OTLPSpanExporter(
     endpoint=f"{OTLP_ENDPOINT}/v1/traces",
 )
 
 provider = TracerProvider(resource=resource)
-provider.add_span_processor(BatchSpanProcessor(exporter))
+provider.add_span_processor(BatchSpanProcessor(trace_exporter))
 trace.set_tracer_provider(provider)
 
 tracer = trace.get_tracer(SERVICE_NAME)
 
+# ── OTel Logger Setup ─────────────────────────────────────────────────────────
+log_exporter = OTLPLogExporter(
+    endpoint=f"{OTLP_ENDPOINT}/v1/logs",
+)
+
+log_provider = LoggerProvider(resource=resource)
+log_provider.add_log_record_processor(BatchLogRecordProcessor(log_exporter))
+set_logger_provider(log_provider)
+
+# Attach OTel handler to Python logging — sends log records via OTLP
+otel_handler = LoggingHandler(level=logging.INFO, logger_provider=log_provider)
+logger = logging.getLogger("vuln-watch-demo")
+logger.addHandler(otel_handler)
+logger.setLevel(logging.INFO)
+
 # ── Flask App ─────────────────────────────────────────────────────────────────
 app = Flask(__name__)
 
-# Auto-instrument all Flask routes — must happen before any route is defined
+# Auto-instrument all Flask routes — must happen after tracer provider is set
 FlaskInstrumentor().instrument_app(app)
 
 # Expose /metrics endpoint for Prometheus scraping
@@ -65,9 +87,10 @@ def _start_timer():
 @app.after_request
 def _log_request(response):
     """
-    Emit a structured JSON log line to stdout after every request.
-    The trace_id field is hex-formatted so the Loki derived field regex
-    'traceId=(\w+)' can extract it and open the trace directly in Tempo.
+    Emit a structured JSON log line after every request.
+    Sent to both stdout (for journalctl) and via OTLP (for Loki).
+    The traceId field is hex-formatted so the Loki derived field regex
+    can extract it and open the trace directly in Tempo.
     """
     duration_ms = round((time.time() - g.start_time) * 1000, 2)
     log_entry = {
@@ -76,9 +99,13 @@ def _log_request(response):
         "path":        request.path,
         "status_code": response.status_code,
         "duration_ms": duration_ms,
-        "traceId":     get_trace_id(),   # key name matches the Loki derived field regex
+        "traceId":     get_trace_id(),
     }
-    print(json.dumps(log_entry), flush=True)
+    msg = json.dumps(log_entry)
+    # stdout — visible in journalctl -u demo-service
+    print(msg, flush=True)
+    # OTLP — sent to OTel Collector → Loki (trace context auto-attached)
+    logger.info(msg)
     return response
 
 

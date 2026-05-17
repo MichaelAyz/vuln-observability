@@ -26,6 +26,10 @@ processors:
       - action: upsert
         key: deployment.environment
         value: production
+      # Tell the Loki exporter which resource attributes to use as stream labels
+      - action: upsert
+        key: loki.resource.labels
+        value: service.name, deployment.environment
 
 exporters:
   # ── Traces → Tempo (OTLP gRPC) ─────────────────────────────────────────────

@@ -38,6 +38,8 @@ receivers:
   - name: "slack-devops-alerts"
     slack_configs:
       - channel: "#DevOps-Alerts"
+        username: "VulnWatch Bot"
+        icon_emoji: ":shield:"
         send_resolved: true
         title: '{{ template "slack.vuln.title" . }}'
         text: '{{ template "slack.vuln.text" . }}'
