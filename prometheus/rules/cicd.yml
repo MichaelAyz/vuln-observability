@@ -5,12 +5,12 @@ groups:
       - alert: CFRThresholdExceeded
         expr: |
           (
-            sum(rate(github_actions_run_total{conclusion="failure",repo="hngprojects/vulnwatch-ui"}[7d]))
+            count(github_workflow_run_status{repo="hngprojects/vulnwatch-ui"} == 0)
             /
-            sum(rate(github_actions_run_total{repo="hngprojects/vulnwatch-ui"}[7d]))
+            count(github_workflow_run_status{repo="hngprojects/vulnwatch-ui"})
           ) > 0.15
           and
-          sum(rate(github_actions_run_total{repo="hngprojects/vulnwatch-ui"}[7d])) > 0
+          count(github_workflow_run_status{repo="hngprojects/vulnwatch-ui"}) > 0
         for: 5m
         labels:
           severity: critical
@@ -22,10 +22,10 @@ groups:
       - alert: MTTRExceeded
         expr: |
           (
-            avg(github_actions_run_duration_seconds{conclusion="success",repo="hngprojects/vulnwatch-ui"})
+            avg(github_workflow_run_duration_ms{repo="hngprojects/vulnwatch-ui"} * on(id) (github_workflow_run_status == 1)) / 1000
           ) > 3600
           and
-          avg(github_actions_run_duration_seconds{repo="hngprojects/vulnwatch-ui"}) > 0
+          avg(github_workflow_run_duration_ms{repo="hngprojects/vulnwatch-ui"}) > 0
         for: 5m
         labels:
           severity: warning

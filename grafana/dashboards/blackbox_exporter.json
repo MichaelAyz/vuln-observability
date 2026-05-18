@@ -31,11 +31,11 @@
               { "color": "yellow", "value": 0.99 },
               { "color": "green", "value": 1.0 }
             ]
-          },
-          "color": { "mode": "background" }
+          }
         }
       },
       "options": {
+        "colorMode": "background",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
       }
     },
@@ -139,11 +139,11 @@
               { "color": "yellow", "value": 30 },
               { "color": "green", "value": 60 }
             ]
-          },
-          "color": { "mode": "background" }
+          }
         }
       },
       "options": {
+        "colorMode": "background",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
       }
     },

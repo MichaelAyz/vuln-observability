@@ -6,8 +6,8 @@ sandbox-key.pem
 
 # Task & Context files
 task6.md
-context.md
 
+context.md
 # Terraform
 **/.terraform/*
 *.tfstate
@@ -63,3 +63,9 @@ pip-delete-this-directory.txt
 .docker/
 tmp/
 temp/
+
+# Environment files
+/etc/github-actions-exporter/env
+*.env
+.env
+**/env

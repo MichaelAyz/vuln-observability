@@ -216,9 +216,6 @@
       },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "background"
-          },
           "mappings": [
             {
               "type": "value",
@@ -235,6 +232,10 @@
             }
           ]
         }
+      },
+      "options": {
+        "colorMode": "background",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
       }
     }
   ]

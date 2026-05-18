@@ -19,12 +19,13 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(github_actions_run_total{conclusion=\"success\", repo=\"hngprojects/vulnwatch-ui\"}[30d]))",
+          "expr": "count(github_workflow_run_status{repo=\"hngprojects/vulnwatch-ui\"} == 1)",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "refId": "A"
+          "refId": "A",
+          "instant": true
         }
       ],
       "datasource": {
@@ -62,12 +63,13 @@
       },
       "targets": [
         {
-          "expr": "avg(github_actions_run_duration_seconds{repo=\"hngprojects/vulnwatch-ui\", conclusion=\"success\"})",
+          "expr": "avg(github_workflow_run_duration_ms{repo=\"hngprojects/vulnwatch-ui\"} * on(id) (github_workflow_run_status == 1)) / 1000",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "refId": "A"
+          "refId": "A",
+          "instant": true
         }
       ],
       "datasource": {
@@ -91,12 +93,13 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(github_actions_run_total{conclusion=\"failure\", repo=\"hngprojects/vulnwatch-ui\"}[30d])) / sum(rate(github_actions_run_total{repo=\"hngprojects/vulnwatch-ui\"}[30d])) * 100",
+          "expr": "(count(github_workflow_run_status{repo=\"hngprojects/vulnwatch-ui\"} == 0) or vector(0)) / count(github_workflow_run_status{repo=\"hngprojects/vulnwatch-ui\"}) * 100",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "refId": "A"
+          "refId": "A",
+          "instant": true
         }
       ],
       "datasource": {
@@ -137,12 +140,13 @@
       },
       "targets": [
         {
-          "expr": "avg(github_actions_run_duration_seconds{repo=\"hngprojects/vulnwatch-ui\", conclusion=\"success\"})",
+          "expr": "avg(github_workflow_run_duration_ms{repo=\"hngprojects/vulnwatch-ui\"} * on(id) (github_workflow_run_status == 1)) / 1000",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "refId": "A"
+          "refId": "A",
+          "instant": true
         }
       ],
       "datasource": {
@@ -183,7 +187,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(github_actions_run_total{conclusion=\"success\", repo=\"hngprojects/vulnwatch-ui\"}[1h]))",
+          "expr": "count(github_workflow_run_status{repo=\"hngprojects/vulnwatch-ui\"} == 1)",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -192,7 +196,7 @@
           "legendFormat": "Success"
         },
         {
-          "expr": "sum(rate(github_actions_run_total{conclusion=\"failure\", repo=\"hngprojects/vulnwatch-ui\"}[1h]))",
+          "expr": "count(github_workflow_run_status{repo=\"hngprojects/vulnwatch-ui\"} == 0)",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
