@@ -8,8 +8,8 @@
 
 {{ define "slack.vuln.text" -}}
 {{ range .Alerts }}
-*Severity:* {{ .Labels.severity | toUpper }}
-*Host:* {{ .Labels.instance | default "N/A" }}
+*Severity:* {{ if eq .Labels.severity "critical" }}CRITICAL{{ else if eq .Labels.severity "warning" }}WARNING{{ else }}{{ .Labels.severity }}{{ end }}
+*Host:* {{ if .Labels.instance }}{{ .Labels.instance }}{{ else }}N/A{{ end }}
 *Summary:* {{ .Annotations.summary }}
 *Detail:* {{ .Annotations.description }}
 *Since:* {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
