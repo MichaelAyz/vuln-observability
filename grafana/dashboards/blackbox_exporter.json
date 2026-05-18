@@ -19,7 +19,7 @@
       },
       "targets": [
         {
-          "expr": "avg(probe_success{job=\"blackbox-http\"})",
+          "expr": "avg(probe_success{job=~\"blackbox-.*\"})",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -55,6 +55,15 @@
             "mode": "background"
           }
         }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
       }
     },
     {
@@ -68,7 +77,7 @@
       },
       "targets": [
         {
-          "expr": "probe_success{job=\"blackbox-http\"}",
+          "expr": "probe_success{job=~\"blackbox-.*\"}",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -102,7 +111,7 @@
       }
     },
     {
-      "title": "HTTP Response Time \u2014 p50/p90/p99",
+      "title": "HTTP Response Time",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -112,31 +121,13 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, rate(probe_http_duration_seconds_bucket{job=\"blackbox-http\"}[5m]))",
+          "expr": "probe_http_duration_seconds{job=\"blackbox-http\"}",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
           "refId": "A",
-          "legendFormat": "p50"
-        },
-        {
-          "expr": "histogram_quantile(0.90, rate(probe_http_duration_seconds_bucket{job=\"blackbox-http\"}[5m]))",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "refId": "B",
-          "legendFormat": "p90"
-        },
-        {
-          "expr": "histogram_quantile(0.99, rate(probe_http_duration_seconds_bucket{job=\"blackbox-http\"}[5m]))",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "refId": "C",
-          "legendFormat": "p99"
+          "legendFormat": "{{ $labels.instance }}"
         }
       ],
       "datasource": {
@@ -178,7 +169,7 @@
       },
       "targets": [
         {
-          "expr": "(probe_ssl_earliest_cert_expiry{job=\"blackbox-http\"} - time()) / 86400",
+          "expr": "(probe_ssl_earliest_cert_expiry{job=\"blackbox-ssl\"} - time()) / 86400",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -219,6 +210,15 @@
             "mode": "background"
           }
         }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
       }
     },
     {
@@ -248,6 +248,15 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short"
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         }
       }
     },
