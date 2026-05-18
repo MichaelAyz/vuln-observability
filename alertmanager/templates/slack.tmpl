@@ -1,62 +1,20 @@
-{{/*
-  ============================================================================
-  slack.tmpl — Structured Alertmanager Slack notification templates
-  Used by: alertmanager/alertmanager.yml receivers[].slack_configs
-  Templates defined: slack.vuln.title | slack.vuln.color | slack.vuln.text
-
-  NOTE: Alertmanager uses Go text/template — NOT Helm/Sprig.
-  Functions like "default", "toUpper", "since" are NOT available.
-  Only standard Go template functions plus Alertmanager builtins are valid.
-  ============================================================================
-*/}}
-
-
-{{/* ── Title ─────────────────────────────────────────────────────────────── */}}
 {{ define "slack.vuln.title" -}}
-  {{- if eq .Status "firing" -}}
-    [FIRING 🔴] {{ .CommonLabels.alertname }}
-    {{- with .Alerts.Firing }} ({{ len . }} alert{{ if gt (len .) 1 }}s{{ end }}){{ end }}
-  {{- else -}}
-    [RESOLVED 🟢] {{ .CommonLabels.alertname }}
-  {{- end -}}
-{{ end }}
+{{ if eq .Status "firing" }}🔴 FIRING{{ else }}🟢 RESOLVED{{ end }} [{{ .Alerts | len }}] {{ .CommonLabels.alertname }}
+{{- end }}
 
-
-{{/* ── Color ──────────────────────────────────────────────────────────────── */}}
 {{ define "slack.vuln.color" -}}
-  {{- if eq .Status "resolved" -}}
-    good
-  {{- else if eq .CommonLabels.severity "critical" -}}
-    danger
-  {{- else -}}
-    warning
-  {{- end -}}
-{{ end }}
+{{ if eq .Status "resolved" }}good{{ else if eq .CommonLabels.severity "critical" }}danger{{ else }}warning{{ end }}
+{{- end }}
 
-
-{{/* ── Body Text ───────────────────────────────────────────────────────────── */}}
 {{ define "slack.vuln.text" -}}
-  {{- range $i, $alert := .Alerts }}
-    {{- if gt $i 0 }}
-─────────────────────────────────────────
-    {{- end }}
-
-*Severity:*  {{ if eq $alert.Labels.severity "critical" -}}
-               🔴 CRITICAL
-             {{- else if eq $alert.Labels.severity "warning" -}}
-               🟡 WARNING
-             {{- else -}}
-               ℹ️  {{ $alert.Labels.severity }}
-             {{- end }}
-*Host:*      {{ if $alert.Labels.instance }}{{ $alert.Labels.instance }}{{ else }}N/A{{ end }}
-*Summary:*   {{ if $alert.Annotations.summary }}{{ $alert.Annotations.summary }}{{ else }}No summary provided{{ end }}
-*Details:*   {{ if $alert.Annotations.description }}{{ $alert.Annotations.description }}{{ else }}No description provided{{ end }}
-*Started:*   {{ $alert.StartsAt }}
-    {{- if $alert.Annotations.runbook_url }}
-*Runbook:*   <{{ $alert.Annotations.runbook_url }}|📖 View Runbook>
-    {{- end }}
-    {{- if $alert.Labels.grafana_url }}
-*Dashboard:* <{{ $alert.Labels.grafana_url }}|📊 Open in Grafana>
-    {{- end }}
-  {{- end }}
+{{ range .Alerts }}
+*Severity:* {{ .Labels.severity | toUpper }}
+*Host:* {{ .Labels.instance | default "N/A" }}
+*Summary:* {{ .Annotations.summary }}
+*Detail:* {{ .Annotations.description }}
+*Since:* {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+{{ if .Annotations.runbook_url }}*Runbook:* <{{ .Annotations.runbook_url }}|📖 View Runbook>{{ end }}
+{{ if .GeneratorURL }}*Source:* <{{ .GeneratorURL }}|🔍 View in Prometheus>{{ end }}
+────────────────────
 {{ end }}
+{{- end }}

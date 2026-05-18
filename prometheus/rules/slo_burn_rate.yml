@@ -1,16 +1,37 @@
-# SLO Burn Rate Alert Rules
-# Validated with: promtool check rules slo_burn_rate.yml
-
-
 groups:
-  - name: slo_burn_rate.placeholder
+  - name: slo_burn_rate
     rules:
-      - alert: PlaceholderSLOBurnRate
-        expr: vector(0)
-        for: 1m
+
+      # Recording rules — pre-compute burn rates for efficiency
+      - record: job:probe_success:rate1h
+        expr: avg_over_time(probe_success{job="blackbox-http"}[1h])
+
+      - record: job:probe_success:rate6h
+        expr: avg_over_time(probe_success{job="blackbox-http"}[6h])
+
+      - record: job:probe_success:rate30d
+        expr: avg_over_time(probe_success{job="blackbox-http"}[30d])
+
+      # Fast burn — 14.4x burn rate means 2% of monthly budget gone in 1 hour
+      # 14.4x burn = error rate > 14.4 * 0.005 = 0.072 (i.e. success rate < 0.928)
+      - alert: SLOFastBurn
+        expr: job:probe_success:rate1h < 0.928
+        for: 2m
         labels:
-          severity: none
+          severity: critical
         annotations:
-          summary: "Placeholder — wired in Phase 6"
-          description: "This rule is replaced in Phase 6 with real SLO burn rate alerts."
-          runbook_url: "https://github.com/hngprojects/vuln-observability/blob/main/runbooks/slo_fast_burn.md"
+          summary: "SLO Fast Burn — availability budget burning at critical rate"
+          description: "1-hour availability is {{ $value | printf \"%.3f\" }} ({{ $value | humanizePercentage }}). Fast burn threshold is 92.8%. At this rate the entire monthly error budget will be exhausted in under 50 hours."
+          runbook_url: "https://github.com/MichaelAyz/vuln-observability/blob/main/runbooks/slo_fast_burn.md"
+
+      # Slow burn — 5x burn rate means 5% of monthly budget gone in 6 hours
+      # 5x burn = error rate > 5 * 0.005 = 0.025 (i.e. success rate < 0.975)
+      - alert: SLOSlowBurn
+        expr: job:probe_success:rate6h < 0.975
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SLO Slow Burn — availability budget consuming faster than expected"
+          description: "6-hour availability is {{ $value | printf \"%.3f\" }} ({{ $value | humanizePercentage }}). Slow burn threshold is 97.5%. At this rate 5% of the monthly error budget will be consumed in 6 hours."
+          runbook_url: "https://github.com/MichaelAyz/vuln-observability/blob/main/runbooks/slo_slow_burn.md"

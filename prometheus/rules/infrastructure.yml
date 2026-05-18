@@ -1,15 +1,73 @@
-# Infrastructure Alert Rules
-# Validated with: promtool check rules infrastructure.yml
-
 groups:
-  - name: infrastructure.placeholder
+  - name: infrastructure
     rules:
-      - alert: PlaceholderInfrastructure
-        expr: vector(0)
+
+      - alert: CPUWarning
+        expr: 100 - (avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU utilisation on {{ $labels.instance }}"
+          description: "CPU utilisation is {{ $value | printf \"%.1f\" }}% on {{ $labels.instance }}. Threshold is 80%."
+          runbook_url: "https://github.com/MichaelAyz/vuln-observability/blob/main/runbooks/cpu_warning.md"
+
+      - alert: CPUCritical
+        expr: 100 - (avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical CPU utilisation on {{ $labels.instance }}"
+          description: "CPU utilisation is {{ $value | printf \"%.1f\" }}% on {{ $labels.instance }}. Threshold is 90%."
+          runbook_url: "https://github.com/MichaelAyz/vuln-observability/blob/main/runbooks/cpu_critical.md"
+
+      - alert: MemoryWarning
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory utilisation on {{ $labels.instance }}"
+          description: "Memory utilisation is {{ $value | printf \"%.1f\" }}% on {{ $labels.instance }}. Threshold is 80%."
+          runbook_url: "https://github.com/MichaelAyz/vuln-observability/blob/main/runbooks/memory_warning.md"
+
+      - alert: MemoryCritical
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical memory utilisation on {{ $labels.instance }}"
+          description: "Memory utilisation is {{ $value | printf \"%.1f\" }}% on {{ $labels.instance }}. Threshold is 90%."
+          runbook_url: "https://github.com/MichaelAyz/vuln-observability/blob/main/runbooks/memory_critical.md"
+
+      - alert: DiskWarning
+        expr: (node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_free_bytes{mountpoint="/"}) / node_filesystem_size_bytes{mountpoint="/"} * 100 > 75
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High disk utilisation on {{ $labels.instance }}"
+          description: "Disk utilisation is {{ $value | printf \"%.1f\" }}% on {{ $labels.instance }} at mountpoint /. Threshold is 75%."
+          runbook_url: "https://github.com/MichaelAyz/vuln-observability/blob/main/runbooks/disk_warning.md"
+
+      - alert: DiskCritical
+        expr: (node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_free_bytes{mountpoint="/"}) / node_filesystem_size_bytes{mountpoint="/"} * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical disk utilisation on {{ $labels.instance }}"
+          description: "Disk utilisation is {{ $value | printf \"%.1f\" }}% on {{ $labels.instance }} at mountpoint /. Threshold is 90%."
+          runbook_url: "https://github.com/MichaelAyz/vuln-observability/blob/main/runbooks/disk_critical.md"
+
+      - alert: ServerDown
+        expr: probe_success{job="blackbox-http"} == 0
         for: 1m
         labels:
-          severity: none
+          severity: critical
         annotations:
-          summary: "Placeholder — wired in Phase 6"
-          description: "This rule is replaced in Phase 6 with real infrastructure alerts."
-          runbook_url: "https://github.com/hngprojects/vuln-observability/blob/main/runbooks/cpu_warning.md"
+          summary: "Server unreachable: {{ $labels.instance }}"
+          description: "Blackbox probe has been failing for {{ $labels.instance }} for more than 1 minute. The service may be down."
+          runbook_url: "https://github.com/MichaelAyz/vuln-observability/blob/main/runbooks/server_down.md"

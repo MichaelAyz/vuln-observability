@@ -6,41 +6,43 @@ templates:
   - "/etc/alertmanager/templates/*.tmpl"
 
 route:
-  group_by: ["service", "severity"]
+  receiver: "slack-devops-alerts"
+  group_by: ["alertname", "severity"]
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 12h
-  receiver: "slack-devops-alerts"
 
   routes:
-    - match:
-        severity: critical
+    - matchers:
+        - severity = "critical"
       receiver: "slack-devops-alerts"
       group_wait: 10s
       repeat_interval: 4h
+      continue: false
 
-    - match:
-        severity: warning
+    - matchers:
+        - severity = "warning"
       receiver: "slack-devops-alerts"
       group_wait: 1m
       repeat_interval: 12h
+      continue: false
 
-# Inhibition: if a host is fully down, suppress CPU/memory/latency noise for that host
 inhibit_rules:
-  - source_match:
-      alertname: "ServerDown"
-      severity: "critical"
-    target_match_re:
-      alertname: "CPUWarning|CPUCritical|MemoryWarning|MemoryCritical"
-    equal: ["instance"]
+  - source_matchers:
+      - alertname = "ServerDown"
+      - severity = "critical"
+    target_matchers:
+      - alertname =~ "CPUWarning|CPUCritical|MemoryWarning|MemoryCritical"
+    equal:
+      - instance
 
 receivers:
   - name: "slack-devops-alerts"
     slack_configs:
       - channel: "#DevOps-Alerts"
-        username: "VulnWatch Bot"
-        icon_emoji: ":shield:"
         send_resolved: true
+        icon_emoji: ":rotating_light:"
+        username: "Vuln Observability"
         title: '{{ template "slack.vuln.title" . }}'
-        text: '{{ template "slack.vuln.text" . }}'
         color: '{{ template "slack.vuln.color" . }}'
+        text: '{{ template "slack.vuln.text" . }}'
