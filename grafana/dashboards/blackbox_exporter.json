@@ -11,99 +11,55 @@
     {
       "title": "Probe Success Rate",
       "type": "stat",
-      "gridPos": {
-        "h": 6,
-        "w": 8,
-        "x": 0,
-        "y": 0
-      },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
       "targets": [
         {
           "expr": "avg(probe_success{job=~\"blackbox-.*\"})",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "refId": "A"
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "instant": true
         }
       ],
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 0.99
-              },
-              {
-                "color": "green",
-                "value": 1.0
-              }
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.99 },
+              { "color": "green", "value": 1.0 }
             ]
           },
-          "color": {
-            "mode": "background"
-          }
+          "color": { "mode": "background" }
         }
       },
       "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        }
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
       }
     },
     {
       "title": "Uptime Timeline",
       "type": "state-timeline",
-      "gridPos": {
-        "h": 6,
-        "w": 16,
-        "x": 8,
-        "y": 0
-      },
+      "gridPos": { "h": 6, "w": 16, "x": 8, "y": 0 },
       "targets": [
         {
           "expr": "probe_success{job=~\"blackbox-.*\"}",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "refId": "A",
           "legendFormat": "{{ $labels.instance }}"
         }
       ],
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "mappings": [
             {
               "type": "value",
               "options": {
-                "0": {
-                  "text": "DOWN",
-                  "color": "red"
-                },
-                "1": {
-                  "text": "UP",
-                  "color": "green"
-                }
+                "0": { "text": "DOWN", "color": "red" },
+                "1": { "text": "UP", "color": "green" }
               }
             }
           ]
@@ -113,47 +69,46 @@
     {
       "title": "HTTP Response Time",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 6
-      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
       "targets": [
         {
-          "expr": "probe_http_duration_seconds{job=\"blackbox-http\"}",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
+          "expr": "probe_http_duration_seconds{job=\"blackbox-http\", phase=\"processing\"}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "refId": "A",
-          "legendFormat": "{{ $labels.instance }}"
+          "legendFormat": "{{ $labels.instance }} (processing)"
+        },
+        {
+          "expr": "probe_http_duration_seconds{job=\"blackbox-http\", phase=\"tls\"}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "B",
+          "legendFormat": "{{ $labels.instance }} (tls)"
+        },
+        {
+          "expr": "probe_http_duration_seconds{job=\"blackbox-http\", phase=\"connect\"}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "C",
+          "legendFormat": "{{ $labels.instance }} (connect)"
+        },
+        {
+          "expr": "probe_http_duration_seconds{job=\"blackbox-http\", phase=\"resolve\"}",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "D",
+          "legendFormat": "{{ $labels.instance }} (dns)"
         }
       ],
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "s",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 0.5
-              }
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.5 }
             ]
           },
           "custom": {
-            "thresholdsStyle": {
-              "mode": "line"
-            }
+            "thresholdsStyle": { "mode": "line" }
           }
         }
       }
@@ -161,129 +116,73 @@
     {
       "title": "SSL Certificate Expiry",
       "type": "stat",
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 14
-      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 14 },
       "targets": [
         {
-          "expr": "(probe_ssl_earliest_cert_expiry{job=\"blackbox-ssl\"} - time()) / 86400",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
+          "expr": "(probe_ssl_earliest_cert_expiry{job=\"blackbox-http\"} - time()) / 86400",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "refId": "A",
-          "legendFormat": "{{ $labels.instance }}"
+          "legendFormat": "{{ $labels.instance }}",
+          "instant": true
         }
       ],
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "d",
+          "decimals": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 14
-              },
-              {
-                "color": "yellow",
-                "value": 30
-              },
-              {
-                "color": "green",
-                "value": 60
-              }
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 14 },
+              { "color": "yellow", "value": 30 },
+              { "color": "green", "value": 60 }
             ]
           },
-          "color": {
-            "mode": "background"
-          }
+          "color": { "mode": "background" }
         }
       },
       "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        }
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
       }
     },
     {
       "title": "HTTP Status Code",
       "type": "stat",
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 14
-      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 14 },
       "targets": [
         {
           "expr": "probe_http_status_code{job=\"blackbox-http\"}",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "refId": "A",
-          "legendFormat": "{{ $labels.instance }}"
+          "legendFormat": "{{ $labels.instance }}",
+          "instant": true
         }
       ],
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "short"
         }
       },
       "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        }
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
       }
     },
     {
       "title": "DNS Lookup Duration",
       "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 14
-      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 14 },
       "targets": [
         {
           "expr": "probe_dns_lookup_time_seconds{job=\"blackbox-http\"}",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "refId": "A",
           "legendFormat": "{{ $labels.instance }}"
         }
       ],
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "s"

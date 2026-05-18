@@ -1,6 +1,5 @@
 # Keys & Secrets
-*.pem
-sandbox*.pem
+sandbox-key.pem
 .env
 .env.*
 !*.example
