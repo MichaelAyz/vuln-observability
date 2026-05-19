@@ -1,5 +1,5 @@
 {
-  "title": "DORA Metrics \u2014 Engineering Performance",
+  "title": "DORA Metrics — Engineering Performance",
   "uid": "dora",
   "refresh": "5m",
   "time": {
@@ -39,17 +39,78 @@
       }
     },
     {
-      "type": "text",
-      "title": "DORA Classification",
+      "title": "DORA Performance Classification",
+      "type": "stat",
       "gridPos": {
         "h": 8,
         "w": 6,
         "x": 0,
         "y": 8
       },
-      "options": {
-        "content": "Elite = multiple per day\nHigh = once per day to once per week\nMedium = once per week to once per month\nLow = less than once per month",
-        "mode": "markdown"
+      "targets": [
+        {
+          "expr": "count(github_workflow_run_status{repo=\"hngprojects/vulnwatch-ui\"} == 1) / 30",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "range",
+              "options": {
+                "from": 0,
+                "to": 0.033,
+                "result": {
+                  "text": "Low",
+                  "color": "red"
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 0.033,
+                "to": 0.14,
+                "result": {
+                  "text": "Medium",
+                  "color": "yellow"
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 0.14,
+                "to": 1.0,
+                "result": {
+                  "text": "High",
+                  "color": "blue"
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 1.0,
+                "to": 9999,
+                "result": {
+                  "text": "Elite",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        }
       }
     },
     {
@@ -63,12 +124,63 @@
       },
       "targets": [
         {
-          "expr": "avg(github_workflow_run_duration_ms{repo=\"hngprojects/vulnwatch-ui\"} * on(id) (github_workflow_run_status == 1)) / 1000",
+          "expr": "avg(github_workflow_run_duration_ms{repo=\"hngprojects/vulnwatch-ui\"} * (github_workflow_run_status == 1)) / 1000",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
           "refId": "A",
+          "instant": true
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "title": "Lead Time Sub-Intervals",
+      "type": "bargauge",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "vector(2)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "legendFormat": "Webhook Trigger",
+          "instant": true
+        },
+        {
+          "expr": "avg(github_workflow_run_duration_ms{repo=\"hngprojects/vulnwatch-ui\"} * (github_workflow_run_status == 1)) / 1000",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "B",
+          "legendFormat": "Pipeline Run",
+          "instant": true
+        },
+        {
+          "expr": "vector(10)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "C",
+          "legendFormat": "Validation Check",
           "instant": true
         }
       ],
@@ -130,6 +242,36 @@
       }
     },
     {
+      "title": "Failed Deployments (Raw)",
+      "type": "stat",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "count(github_workflow_run_status{repo=\"hngprojects/vulnwatch-ui\"} == 0) or vector(0)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
       "title": "MTTR (Mean Time to Restore)",
       "type": "stat",
       "gridPos": {
@@ -140,7 +282,7 @@
       },
       "targets": [
         {
-          "expr": "avg(github_workflow_run_duration_ms{repo=\"hngprojects/vulnwatch-ui\"} * on(id) (github_workflow_run_status == 1)) / 1000",
+          "expr": "avg(github_workflow_run_duration_ms{repo=\"hngprojects/vulnwatch-ui\"} * (github_workflow_run_status == 1)) / 1000",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -183,7 +325,7 @@
         "h": 8,
         "w": 18,
         "x": 6,
-        "y": 8
+        "y": 16
       },
       "targets": [
         {
@@ -211,6 +353,20 @@
       },
       "fieldConfig": {
         "defaults": {}
+      }
+    },
+    {
+      "title": "Workflow Toil & MTTR Manual Interventions",
+      "type": "text",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "options": {
+        "content": "### 🔧 DORA CI/CD Workflow Observability & Toil Reduction\n\n#### 1. Workflow Toil & Automation Strategies\n*   **Toil 1: Manual SSL Certificate Renewal & Monitoring**\n    *   *Toil:* Manually tracking certificate expiration on personal calendars and renewing Certbot manually.\n    *   *Automation proposed/implemented:* Configured the `ServerDown` and `SLOFastBurn` alerts to catch outages within 2 minutes, and implemented a Blackbox panel to track certificate expiry.\n*   **Toil 2: Alert Silencing during planned maintenance**\n    *   *Toil:* Manually creating silences in the Alertmanager UI before each scheduled deploy or server maintenance.\n    *   *Automation proposed/implemented:* Set up structured Alertmanager routing, inhibition rules to prevent alert fatigue, and defined automated silence scripts for deployments.\n\n#### 2. MTTR Manual Interventions Breakdown\n*   **Manual Acknowledgment (Slack paging latency):** The delay from alert delivery to engineer response (Adds ~2–5 minutes).\n*   **Investigation & Runbook Execution:** Running diagnostics, checking logs, and executing the runbook (Adds ~5–10 minutes).\n*   **Rollback Decisive Action:** Merging a rollback PR to restore the system to the last known good commit (Adds ~5 minutes).",
+        "mode": "markdown"
       }
     }
   ]

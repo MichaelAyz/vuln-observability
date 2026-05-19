@@ -1,3 +1,6 @@
+# ==============================================================================
+# Alertmanager Configuration — Routing, Inhibition & Silencing Policy
+# ==============================================================================
 global:
   resolve_timeout: 5m
   slack_api_url: "https://hooks.slack.com/services/PLACEHOLDER"
@@ -5,36 +8,66 @@ global:
 templates:
   - "/etc/alertmanager/templates/*.tmpl"
 
+# ── ROUTING POLICY ────────────────────────────────────────────────────────────
+# Alerts are grouped by alertname, severity, job, and service to keep notifications
+# contextualized. Firing alerts are routed to the #DevOps-Alerts Slack channel.
 route:
   receiver: "slack-devops-alerts"
-  group_by: ["alertname", "severity"]
+  group_by: ["alertname", "severity", "job", "service"]
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 12h
 
   routes:
+    # 1. Critical Severity Route (faster notification time)
     - matchers:
         - severity = "critical"
       receiver: "slack-devops-alerts"
       group_wait: 10s
+      group_interval: 2m
       repeat_interval: 4h
       continue: false
 
+    # 2. Warning Severity Route (slower to reduce alert fatigue)
     - matchers:
         - severity = "warning"
       receiver: "slack-devops-alerts"
       group_wait: 1m
+      group_interval: 5m
       repeat_interval: 12h
       continue: false
 
+# ── INHIBITION POLICY ─────────────────────────────────────────────────────────
+# When a host is fully unreachable (ServerDown is firing), all downstream resource
+# metrics (CPU, RAM, Disk) and latency/SLO alerts are automatically suppressed.
 inhibit_rules:
   - source_matchers:
       - alertname = "ServerDown"
       - severity = "critical"
     target_matchers:
-      - alertname =~ "CPUWarning|CPUCritical|MemoryWarning|MemoryCritical"
+      - alertname =~ "CPUWarning|CPUCritical|MemoryWarning|MemoryCritical|DiskWarning|DiskCritical|SLOFastBurn|SLOSlowBurn"
     equal:
       - instance
+
+# ── SILENCING DOCUMENTATION ───────────────────────────────────────────────────
+# Planned Maintenance Silencing Procedure:
+# During scheduled deployments or hardware maintenance, alerts should be silenced
+# in Alertmanager to prevent false positives in #DevOps-Alerts.
+#
+# Method 1: Via Alertmanager Web UI
+# 1. Access Alertmanager UI at http://3.219.30.122:9093/#/silences
+# 2. Click "New Silence"
+# 3. Add matchers (e.g., instance="localhost:8080" or job="demo-service")
+# 4. Set the duration and provide a clear comment (e.g., "Planned deploy maintenance")
+# 5. Click "Create"
+#
+# Method 2: Via Alertmanager CLI (amtool)
+# Run from a local machine or server:
+#   amtool silence add --alertmanager.url=http://localhost:9093 \
+#     instance="localhost:8080" \
+#     --duration=1h \
+#     --comment="Planned deployment release maintenance"
+# ==============================================================================
 
 receivers:
   - name: "slack-devops-alerts"

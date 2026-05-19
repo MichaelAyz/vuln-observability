@@ -8,13 +8,17 @@
 
 {{ define "slack.vuln.text" -}}
 {{ range .Alerts }}
-*Severity:* {{ if eq .Labels.severity "critical" }}CRITICAL{{ else if eq .Labels.severity "warning" }}WARNING{{ else }}{{ .Labels.severity }}{{ end }}
+*Alert:* {{ .Labels.alertname }}
+*Status:* {{ if eq .Status "firing" }}🔥 Firing{{ else }}✅ Resolved{{ end }}
+*Severity:* {{ if eq .Labels.severity "critical" }}🔴 CRITICAL{{ else if eq .Labels.severity "warning" }}⚠️ WARNING{{ else }}{{ .Labels.severity }}{{ end }}
 *Host:* {{ if .Labels.instance }}{{ .Labels.instance }}{{ else }}N/A{{ end }}
 *Summary:* {{ .Annotations.summary }}
-*Detail:* {{ .Annotations.description }}
+*Current Metric Value:* {{ .Annotations.description }}
 *Since:* {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
-{{ if .Annotations.runbook_url }}*Runbook:* <{{ .Annotations.runbook_url }}|📖 View Runbook>{{ end }}
-{{ if .GeneratorURL }}*Source:* <{{ .GeneratorURL }}|🔍 View in Prometheus>{{ end }}
+
+{{ if .Annotations.runbook_url }}*Runbook:* <{{ .Annotations.runbook_url }}|📖 View Incident Runbook>{{ end }}
+*Grafana Dashboard:* {{ if eq .Labels.alertname "ServerDown" }}<http://3.219.30.122:3000/d/blackbox/blackbox-exporter|📊 Blackbox Exporter Dashboard>{{ else if or (eq .Labels.alertname "SLOFastBurn") (eq .Labels.alertname "SLOSlowBurn") }}<http://3.219.30.122:3000/d/slo/slo-and-error-budgets|📊 SLO & Error Budget Dashboard>{{ else if or (eq .Labels.alertname "CFRThresholdExceeded") (eq .Labels.alertname "MTTRExceeded") }}<http://3.219.30.122:3000/d/dora/dora-metrics|📊 DORA Metrics Dashboard>{{ else }}<http://3.219.30.122:3000/d/node/node-exporter|📊 Node Exporter Dashboard>{{ end }}
+{{ if .GeneratorURL }}*Source Metric:* <{{ .GeneratorURL }}|🔍 View in Prometheus>{{ end }}
 ────────────────────
 {{ end }}
 {{- end }}

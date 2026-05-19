@@ -69,3 +69,9 @@ temp/
 *.env
 .env
 **/env
+
+# Temporary deployment archives & binaries
+deploy.tar.gz
+deploy.tar
+terraform.exe
+terraform.zip

@@ -77,6 +77,9 @@ mkdir -p /etc/prometheus/rules
 # Alertmanager templates subdirectory — required for cp -r in Section 5
 mkdir -p /etc/alertmanager/templates
 
+# Grafana dashboards subdirectory
+mkdir -p /var/lib/grafana/dashboards
+
 mkdir -p ${CONFIG_BASE}/otel-collector
 mkdir -p ${CONFIG_BASE}/blackbox-exporter
 mkdir -p ${CONFIG_BASE}/github-actions-exporter
@@ -214,7 +217,8 @@ cp "${REPO_DIR}/tempo/tempo-config.yml"              /etc/tempo/tempo-config.yml
 cp "${REPO_DIR}/alertmanager/alertmanager.yml"       /etc/alertmanager/alertmanager.yml
 cp -r "${REPO_DIR}/alertmanager/templates/."         /etc/alertmanager/templates/
 cp "${REPO_DIR}/otel-collector/otel-collector-config.yml" /etc/otel-collector/config.yml
-cp -r "${REPO_DIR}/grafana/."                        /etc/grafana/
+cp -r "${REPO_DIR}/grafana/provisioning/."           /etc/grafana/provisioning/
+cp -r "${REPO_DIR}/grafana/dashboards/"*.json        /var/lib/grafana/dashboards/
 
 echo "==> Setting directory ownership..."
 chown -R prometheus:prometheus /etc/prometheus /var/lib/prometheus
@@ -224,6 +228,7 @@ chown -R alertmanager:alertmanager /etc/alertmanager /var/lib/alertmanager
 chown -R blackbox:blackbox     /etc/blackbox-exporter
 chown -R otel:otel             /etc/otel-collector
 chown -R ghexporter:ghexporter /etc/github-actions-exporter
+chown -R grafana:grafana       /etc/grafana /var/lib/grafana
 
 # ============================================================================
 # Section 6 — Substitute environment variables in configs
@@ -254,10 +259,11 @@ chown -R demoservice:demoservice /opt/demo-service
 echo "==> Installing systemd unit files..."
 cp "${REPO_DIR}/systemd/"*.service /etc/systemd/system/
 
-# Inject GITHUB_PAT into the github-actions-exporter unit (now that it's been copied)
+# Create the github-actions-exporter env file automatically
 if [ "${GITHUB_PAT}" != "placeholder_token" ]; then
-  sed -i "s|Environment=\"GITHUB_TOKEN=placeholder_token\"|Environment=\"GITHUB_TOKEN=${GITHUB_PAT}\"|g" \
-    /etc/systemd/system/github-actions-exporter.service
+  echo "GITHUB_TOKEN=${GITHUB_PAT}" > /etc/github-actions-exporter/env
+  chmod 600 /etc/github-actions-exporter/env
+  chown ghexporter:ghexporter /etc/github-actions-exporter/env
 fi
 
 systemctl daemon-reload
@@ -273,6 +279,12 @@ for srv in $SERVICES; do
   systemctl enable "$srv" || echo "  [WARN] Could not enable $srv"
   systemctl restart "$srv" || echo "  [WARN] Could not start $srv — check: journalctl -u $srv -n 20"
 done
+
+echo "==> Note on Grafana Authentication:"
+# By design, Grafana uses admin/admin for the initial login. 
+# We do not use grafana-cli admin reset-admin-password here because the 
+# SQLite DB initialization takes 5-15 seconds after the service starts, 
+# and running it immediately will cause set -e to abort the script.
 
 # ============================================================================
 # Section 10 — Health verification

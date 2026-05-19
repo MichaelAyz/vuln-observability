@@ -22,7 +22,7 @@ groups:
       - alert: MTTRExceeded
         expr: |
           (
-            avg(github_workflow_run_duration_ms{repo="hngprojects/vulnwatch-ui"} * on(id) (github_workflow_run_status == 1)) / 1000
+            avg(github_workflow_run_duration_ms{repo="hngprojects/vulnwatch-ui"} * (github_workflow_run_status == 1)) / 1000
           ) > 3600
           and
           avg(github_workflow_run_duration_ms{repo="hngprojects/vulnwatch-ui"}) > 0

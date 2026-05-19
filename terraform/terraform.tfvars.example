@@ -1,0 +1,5 @@
+ssh_private_key_path     = "../sandbox-key.pem"
+vm_host                  = "3.219.30.122"
+vm_user                  = "ubuntu"
+slack_webhook_url        = "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+github_pat               = "ghp_your_token_here"

@@ -1,17 +1,38 @@
-# vuln-observability
+# Vuln Observability
 
 Production-grade observability and reliability platform — LGTM Stack, DORA Metrics & SLOs.
 
-> README fully populated in Phase 12.
+## Quick Start (One-Command Deployment)
 
-## Quick Start
+The entire stack is strictly managed as Infrastructure as Code using Terraform. Follow these three steps to provision the full platform onto a fresh server.
 
+### Prerequisites
+* **Git** installed to clone the repository
+* **Terraform** (>= 1.5.0) installed on your local machine
+* **SSH Private Key** configured for root/sudo access to your target server
+
+### 1. Clone the repository
 ```bash
-# One-command deployment (populated in Phase 12)
-terraform init && terraform apply
+git clone https://github.com/MichaelAyz/vuln-observability.git
+cd vuln-observability
 ```
 
-## Stack Components
+### 2. Configure Secrets
+We must never commit live secrets to git. Copy the HCL example to create your local variables file:
+```bash
+cp terraform/terraform.tfvars.example terraform/terraform.tfvars
+```
+Open `terraform/terraform.tfvars` and edit it with your real SSH key path, target IP, Slack webhook, and GitHub PAT. This file is git-ignored.
+
+### 3. Deploy
+```bash
+cd terraform
+terraform init
+terraform apply -auto-approve
+```
+That's it! Terraform will securely rsync the configuration and remotely provision the entire stack.
+
+---
 
 | Component | Role | Port |
 |-----------|------|------|
@@ -26,14 +47,74 @@ terraform init && terraform apply
 | Demo Service | OTel-instrumented Flask app | 5000 |
 | GitHub Actions Exporter | DORA metrics source | 9999 |
 
+## Configure Data Collection, Exporters & Retention Policies
+
+All metrics, logs, and traces are collected using a standardized, production-grade telemetry pipeline.
+
+### Telemetry Flow & Data Collection
+1. **Metrics Collection:**
+   * **Prometheus:** Acts as the primary metrics database. It scrapes the following targets:
+     * **Node Exporter:** Scrapes system-level metrics (CPU, Memory, Disk, Network) at a **15-second interval**.
+     * **Blackbox Exporter:** Probes public HTTPS endpoints and SSL expiry for `vuln-watch.hng14.com` and `staging.vuln-watch.hng14.com`.
+     * **GitHub Actions Exporter:** Pulls workflow run statuses, durations, and CI/CD events to feed DORA metrics at a **60-second interval**.
+     * **OTel Collector / Demo Service:** Scrapes application metrics from the OpenTelemetry instrumented Flask application.
+2. **Logs Collection:**
+   * **Loki:** Serves as the log aggregation database. Application and system logs are ingested via the OpenTelemetry Collector and forwarded directly to Loki.
+3. **Traces Collection:**
+   * **Tempo:** Serves as the distributed tracing backend. Traces emitted from the OTel-instrumented demo service are received by the OTel Collector and forwarded directly to Tempo.
+
+### Data Retention Periods
+To manage disk usage and comply with policy standards, retention is strictly enforced:
+*   **Prometheus (Metrics):** **15 Days** (configured via `--storage.tsdb.retention.time=15d` in the systemd service unit).
+*   **Loki (Logs):** **7 Days** (configured via `limits_config.retention_period: 168h` and `retention_enabled: true` in `loki-config.yml`).
+*   **Tempo (Traces):** **2 Days** (configured via `block_retention: 48h` in `tempo-config.yml`).
+
+### systemd Services Hardening
+All 9 core components run as native systemd services on the production server. Each service is fully configured with an automatic restart policy (`Restart=always`, `RestartSec=5`) to ensure zero-downtime availability and instant recovery after server reboot or process failure:
+
+| Service Name | Description | Port | Restart Policy | Status |
+|---|---|---|---|---|
+| `prometheus.service` | Prometheus Monitoring Server | `9090` | `always` (5s delay) | `active (running)` |
+| `loki.service` | Loki Log Aggregation System | `3100` | `always` (5s delay) | `active (running)` |
+| `tempo.service` | Tempo Distributed Tracing Backend | `3200` | `always` (5s delay) | `active (running)` |
+| `node-exporter.service` | System Metrics Exporter | `9100` | `always` (5s delay) | `active (running)` |
+| `blackbox-exporter.service` | Network/HTTP Probe Exporter | `9115` | `always` (5s delay) | `active (running)` |
+| `alertmanager.service` | Alert Notification Manager | `9093` | `always` (5s delay) | `active (running)` |
+| `otel-collector.service` | OpenTelemetry Pipeline Collector | `4327/4328`| `always` (5s delay) | `active (running)` |
+| `demo-service.service` | OpenTelemetry Instrumented App | `8080` | `always` (5s delay) | `active (running)` |
+| `github-actions-exporter.service`| GitHub Actions DORA Exporter | `9999` | `always` (5s delay) | `active (running)` |
+
+## Error Budget Policy Summary
+
+Reliability is managed through strict Error Budgets:
+- **Availability SLO:** 99.5% uptime (measured via Blackbox probes). Provides an Error Budget of ~216 minutes/month.
+- **Latency SLO:** 95% of requests complete under 500ms.
+- **Action Thresholds:**
+  - **> 50% Budget Consumed:** Slowdown non-critical feature work and trigger reliability review.
+  - **100% Budget Consumed:** Feature freeze enacted. Mandatory Post-Incident Review (PIR) and reliability sprint required before shipping new features.
+
 ## Dashboard Guide
 
-> Populated in Phase 12.
+The stack provisions 5 zero-config Grafana Dashboards to trace root causes seamlessly.
+1. **Node Exporter**: System-level baseline (CPU, Memory, Disk, Network). Check here for resource starvation.
+2. **Blackbox Exporter**: External HTTP uptime and SSL certificate expiry countdowns. Check here for routing/DNS or certificate failures.
+3. **DORA Metrics**: CI/CD velocity. Tracks Deployment Frequency (Elite/High/Medium/Low), Lead Time for Changes, Change Failure Rate, and MTTR.
+4. **SLO & Error Budget**: Tracks the burn rate of your Error Budget. Features Fast (14.4x) and Slow (5x) burn alerts.
+5. **Unified Observability (The Most Important Dashboard)**:
+   - Begin by observing error rate or latency spikes.
+   - Select a time window on the spike.
+   - The correlated **Loki Logs Panel** automatically syncs to that exact window.
+   - Click the `TraceID` derived field in any log line to seamlessly jump into **Tempo** and view the distributed trace timeline.
 
-## Error Budget Policy
+## How to Update the Stack
 
-> Populated in Phase 4.
+To deploy configuration changes (like new Prometheus alert rules or Grafana dashboards):
+```bash
+# 1. Pull the latest code
+git pull origin main
 
-## Toil Reduction
-
-> Populated in Phase 8.
+# 2. Re-apply Terraform
+cd terraform
+terraform apply -auto-approve
+```
+Terraform will automatically sync the directory diff and reload the systemd services with zero downtime.
