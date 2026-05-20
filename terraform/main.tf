@@ -76,7 +76,7 @@ resource "null_resource" "deploy_observability_stack" {
       "tar -xzf /home/${var.vm_user}/deploy.tar.gz -C /home/${var.vm_user}/vuln-observability",
       "cd /home/${var.vm_user}/vuln-observability",
       "chmod +x systemd/install.sh",
-      "sudo SLACK_WEBHOOK_URL='${var.slack_webhook_url}' GITHUB_PAT='${var.github_pat}' ./systemd/install.sh"
+      "sudo SLACK_WEBHOOK_URL='${var.slack_webhook_url}' GITHUB_PAT='${var.github_pat}' GITHUB_REPOSITORY='${var.github_repository}' ./systemd/install.sh"
     ]
   }
 }

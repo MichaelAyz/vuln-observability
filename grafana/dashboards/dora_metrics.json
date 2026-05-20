@@ -19,7 +19,7 @@
       },
       "targets": [
         {
-          "expr": "count(github_workflow_run_status{repo=\"hngprojects/vulnwatch-ui\"} == 1)",
+          "expr": "count(github_workflow_run_status{repo=~\".*\"} == 1)",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -49,7 +49,7 @@
       },
       "targets": [
         {
-          "expr": "count(github_workflow_run_status{repo=\"hngprojects/vulnwatch-ui\"} == 1) / 30",
+          "expr": "count(github_workflow_run_status{repo=~\".*\"} == 1) / 30",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -124,7 +124,7 @@
       },
       "targets": [
         {
-          "expr": "avg(github_workflow_run_duration_ms{repo=\"hngprojects/vulnwatch-ui\"} * (github_workflow_run_status == 1)) / 1000",
+          "expr": "avg(github_workflow_run_duration_ms{repo=~\".*\"} * (github_workflow_run_status == 1)) / 1000",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -164,7 +164,7 @@
           "instant": true
         },
         {
-          "expr": "avg(github_workflow_run_duration_ms{repo=\"hngprojects/vulnwatch-ui\"} * (github_workflow_run_status == 1)) / 1000",
+          "expr": "avg(github_workflow_run_duration_ms{repo=~\".*\"} * (github_workflow_run_status == 1)) / 1000",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -205,7 +205,7 @@
       },
       "targets": [
         {
-          "expr": "(count(github_workflow_run_status{repo=\"hngprojects/vulnwatch-ui\"} == 0) or vector(0)) / count(github_workflow_run_status{repo=\"hngprojects/vulnwatch-ui\"}) * 100",
+          "expr": "(count(github_workflow_run_status{repo=~\".*\"} == 0) or vector(0)) / count(github_workflow_run_status{repo=~\".*\"}) * 100",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -252,7 +252,7 @@
       },
       "targets": [
         {
-          "expr": "count(github_workflow_run_status{repo=\"hngprojects/vulnwatch-ui\"} == 0) or vector(0)",
+          "expr": "count(github_workflow_run_status{repo=~\".*\"} == 0) or vector(0)",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -282,7 +282,7 @@
       },
       "targets": [
         {
-          "expr": "avg(github_workflow_run_duration_ms{repo=\"hngprojects/vulnwatch-ui\"} * (github_workflow_run_status == 1)) / 1000",
+          "expr": "avg(github_workflow_run_duration_ms{repo=~\".*\"} * (github_workflow_run_status == 1)) / 1000",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -329,7 +329,7 @@
       },
       "targets": [
         {
-          "expr": "count(github_workflow_run_status{repo=\"hngprojects/vulnwatch-ui\"} == 1)",
+          "expr": "count(github_workflow_run_status{repo=~\".*\"} == 1)",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -338,7 +338,7 @@
           "legendFormat": "Success"
         },
         {
-          "expr": "count(github_workflow_run_status{repo=\"hngprojects/vulnwatch-ui\"} == 0)",
+          "expr": "count(github_workflow_run_status{repo=~\".*\"} == 0)",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"

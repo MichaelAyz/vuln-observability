@@ -261,7 +261,12 @@ cp "${REPO_DIR}/systemd/"*.service /etc/systemd/system/
 
 # Create the github-actions-exporter env file automatically
 if [ "${GITHUB_PAT}" != "placeholder_token" ]; then
-  echo "GITHUB_TOKEN=${GITHUB_PAT}" > /etc/github-actions-exporter/env
+  {
+    echo "GITHUB_TOKEN=${GITHUB_PAT}"
+    echo "GITHUB_REPOS=${GITHUB_REPOSITORY}"
+    echo "GITHUB_REPOSITORY=${GITHUB_REPOSITORY}"
+    echo "PORT=9999"
+  } > /etc/github-actions-exporter/env
   chmod 600 /etc/github-actions-exporter/env
   chown ghexporter:ghexporter /etc/github-actions-exporter/env
 fi

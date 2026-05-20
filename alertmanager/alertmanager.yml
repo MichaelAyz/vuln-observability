@@ -75,7 +75,7 @@ receivers:
       - channel: "#DevOps-Alerts"
         send_resolved: true
         icon_emoji: ":rotating_light:"
-        username: "Vuln Observability"
+        username: "vuln-bot"
         title: '{{ template "slack.vuln.title" . }}'
         color: '{{ template "slack.vuln.color" . }}'
         text: '{{ template "slack.vuln.text" . }}'

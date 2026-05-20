@@ -75,3 +75,9 @@ deploy.tar.gz
 deploy.tar
 terraform.exe
 terraform.zip
+
+# Presentation & Cheat Sheets
+system_cheat_sheet.md
+code_commands_cheat_sheet.md
+presentation.md
+

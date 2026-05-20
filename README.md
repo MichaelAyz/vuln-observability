@@ -34,6 +34,65 @@ That's it! Terraform will securely rsync the configuration and remotely provisio
 
 ---
 
+## System Architecture & Dataflow
+
+Our observability platform leverages a unified, high-performance Ubuntu instance running a fully self-hosted, custom-instrumented LGTM (Loki, Grafana, Tempo, Prometheus) telemetry engine.
+
+### Architecture Diagram (ASCII)
+
+```
+                            ┌───────────────────────────────────────┐
+                            │          OBSERVABILITY STACK          │
+                            │             ARCHITECTURE              │
+                            └───────────────────┬───────────────────┘
+                                                │
+                                                ▼
+ ┌──────────────────────┐            ┌────────────────────┐            ┌──────────────────────┐
+ │ APPLICATION SERVICE  │            │ SYSTEM EXPORTERS   │            │ EXTERNAL PROBING     │
+ │ (Demo Flask Service) │            │ (Node / GitHub)    │            │ (Blackbox Exporter)  │
+ └──────────┬───────────┘            └──────────┬─────────┘            └──────────┬───────────┘
+            │                                   │                                 │
+            │ (OTLP Logs                        │ (Prometheus                     │ (Health
+            │  & Traces)                        │  Scrapes)                       │  Checks)
+            ▼                                   ▼                                 ▼
+ ┌──────────────────────┐            ┌────────────────────┐            ┌──────────┴───────────┐
+ │  OTEL COLLECTOR      │            │   PROMETHEUS DB    │◄───────────┤  BLACKBOX EXPORTER   │
+ └──────┬────────┬──────┘            └──────────┬─────────┘            └──────────────────────┘
+        │        │                              │
+        │        │                              │ (Evaluate
+        │        │                              │  Alert Rules)
+        ▼        ▼                              ▼
+ ┌──────┴───┐┌───┴──────┐            ┌──────────┴─────────┐            ┌──────────────────────┐
+ │  TEMPO   ││   LOKI   │            │   ALERTMANAGER     ├───────────►│    SLACK CHANNEL     │
+ │ (Traces) ││ (Logs)   │            └────────────────────┘            │   (#DevOps-Alerts)   │
+ └──────┬───┘└───┬──────┘                                              └──────────────────────┘
+        │        │
+        │        │ (Correlate & Query Metrics, Logs, & Traces)
+        ▼        ▼
+ ┌────────────────────────────────────────────────────────────────────────────────────────────┐
+ │                                        GRAFANA UI                                          │
+ └────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Architectural Design Breakdown
+
+1. **Telemetry Ingestion Layer (OpenTelemetry & Exporters)**
+   * **OpenTelemetry Collector**: Serves as a unified telemetry gateway. It receives application spans (traces) and structured logging context, routing them asynchronously to Loki and Tempo.
+   * **Node Exporter**: Installed natively on the host to collect low-level OS metrics (CPU, Memory, Disk, Network).
+   * **Blackbox Exporter**: Runs external, multi-region synthetic network tests targeting our endpoints to measure real user availability.
+   * **GitHub Actions Exporter**: Periodically queries the GitHub API to dynamically capture pipeline delivery performance for DORA analysis.
+
+2. **Storage and Correlation Layer (The LGTM Core)**
+   * **Prometheus**: Operates on a robust, non-intrusive pull topology to store system metrics periodically.
+   * **Loki**: Serves as our zero-indexing log aggregation engine, matching logs dynamically using trace context tags.
+   * **Tempo**: High-cardinality distributed tracing storage backend that enables full transaction transaction mapping.
+
+3. **Visualization & Alerting Layer**
+   * **Grafana**: The single plane of glass. Grafana integrates all three telemetry pillars, enabling engineers to click on a CPU or latency spike, pull the correlated Loki logs, and click a log trace ID to instantly trace the transaction in Tempo.
+   * **Alertmanager**: Evaluates active alerts from Prometheus, de-duplicates noise, handles inhibition rules, and delivers formatted alerts to Slack.
+
+---
+
 | Component | Role | Port |
 |-----------|------|------|
 | Prometheus | Metrics collection & storage | 9090 |
