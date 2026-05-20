@@ -47,21 +47,23 @@ resource "null_resource" "deploy_observability_stack" {
   # Re-run this resource whenever the install script changes.
   # Add other critical files here to trigger re-deploys on config changes.
   triggers = {
-    install_hash = filemd5("${path.root}/../systemd/install.sh")
+    install_hash           = filemd5("${path.root}/../systemd/install.sh")
+    github_repository_hash = var.github_repository
+    github_pat_hash        = var.github_pat
+    slack_webhook_url_hash = var.slack_webhook_url
   }
 
-  # ── Step 1: rsync the repo to the VM ────────────────────────────────────────
-  # Terraform's file provisioner copies individual files only, not directories.
-  # rsync handles the full recursive directory copy efficiently, skipping
-  # unchanged files and removing deleted ones (--delete flag).
+  # ── Step 1: Package and copy the repo to the VM ──────────────────────────────
   provisioner "local-exec" {
-    command = <<-EOT
-      cd ${path.root}/../ && tar -czf deploy.tar.gz --exclude=.git --exclude=terraform/.terraform --exclude=terraform/*.tfstate* --exclude=deploy.tar.gz .
-      scp -i ${var.ssh_private_key_path} -o StrictHostKeyChecking=no deploy.tar.gz ${var.vm_user}@${var.vm_host}:/home/${var.vm_user}/deploy.tar.gz
+    command     = <<EOT
+      Set-Location -Path "${abspath(path.root)}/../"
+      tar -czf deploy.tar.gz --exclude=.git --exclude=terraform/.terraform --exclude=terraform/*.tfstate* --exclude=deploy.tar.gz .
+      scp -i "${abspath(path.root)}/${var.ssh_private_key_path}" -o StrictHostKeyChecking=no deploy.tar.gz "${var.vm_user}@${var.vm_host}:/home/${var.vm_user}/deploy.tar.gz"
     EOT
+    interpreter = ["PowerShell", "-Command"]
   }
 
-  # ── Step 2: Pull images and bring the stack up ───────────────────────────────
+  # ── Step 2: Extract files and run the install script ─────────────────────────
   provisioner "remote-exec" {
     connection {
       type        = "ssh"
@@ -74,6 +76,7 @@ resource "null_resource" "deploy_observability_stack" {
     inline = [
       "mkdir -p /home/${var.vm_user}/vuln-observability",
       "tar -xzf /home/${var.vm_user}/deploy.tar.gz -C /home/${var.vm_user}/vuln-observability",
+      "rm -f /home/${var.vm_user}/deploy.tar.gz",
       "cd /home/${var.vm_user}/vuln-observability",
       "chmod +x systemd/install.sh",
       "sudo SLACK_WEBHOOK_URL='${var.slack_webhook_url}' GITHUB_PAT='${var.github_pat}' GITHUB_REPOSITORY='${var.github_repository}' ./systemd/install.sh"

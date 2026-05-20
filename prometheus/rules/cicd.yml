@@ -16,7 +16,7 @@ groups:
           severity: critical
         annotations:
           summary: "Change Failure Rate exceeds 15% SLO threshold"
-          description: "CFR over the last 7 days is {{ $value | humanizePercentage }} for hngprojects/vulnwatch-ui. This exceeds the 15% SLO threshold."
+          description: "CFR over the last 7 days is {{ $value | humanizePercentage }} for {{ $labels.repo }}. This exceeds the 15% SLO threshold."
           runbook_url: "https://github.com/MichaelAyz/vuln-observability/blob/main/runbooks/cfr_threshold_exceeded.md"
 
       - alert: MTTRExceeded
@@ -31,5 +31,5 @@ groups:
           severity: warning
         annotations:
           summary: "Mean Time to Restore exceeds 1-hour threshold"
-          description: "Average workflow restore duration is {{ $value | humanizeDuration }} for hngprojects/vulnwatch-ui. This exceeds the 1-hour MTTR threshold."
+          description: "Average workflow restore duration is {{ $value | humanizeDuration }} for {{ $labels.repo }}. This exceeds the 1-hour MTTR threshold."
           runbook_url: "https://github.com/MichaelAyz/vuln-observability/blob/main/runbooks/mttr_exceeded.md"
