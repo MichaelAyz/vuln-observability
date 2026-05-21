@@ -22,7 +22,7 @@ groups:
         annotations:
           summary: "SLO Fast Burn — availability budget burning at critical rate"
           description: "1-hour availability is {{ $value | printf \"%.3f\" }} ({{ $value | humanizePercentage }}). Fast burn threshold is 92.8%. At this rate the entire monthly error budget will be exhausted in under 50 hours."
-          runbook_url: "https://github.com/MichaelAyz/vuln-observability/blob/main/runbooks/slo_fast_burn.md"
+          runbook_url: "__GITHUB_REPO_URL__/blob/main/runbooks/slo_fast_burn.md"
 
       # Slow burn — 5x burn rate means 5% of monthly budget gone in 6 hours
       # 5x burn = error rate > 5 * 0.005 = 0.025 (i.e. success rate < 0.975)
@@ -34,4 +34,89 @@ groups:
         annotations:
           summary: "SLO Slow Burn — availability budget consuming faster than expected"
           description: "6-hour availability is {{ $value | printf \"%.3f\" }} ({{ $value | humanizePercentage }}). Slow burn threshold is 97.5%. At this rate 5% of the monthly error budget will be consumed in 6 hours."
-          runbook_url: "https://github.com/MichaelAyz/vuln-observability/blob/main/runbooks/slo_slow_burn.md"
+          runbook_url: "__GITHUB_REPO_URL__/blob/main/runbooks/slo_slow_burn.md"
+
+  # =============================================================================
+  # Four Golden Signals — Application SLOs (demo-service)
+  # Source metric: flask_http_request_duration_seconds (histogram)
+  # =============================================================================
+  - name: slo_application
+    rules:
+
+      # ---------------------------------------------------------------------------
+      # Signal 1: LATENCY — p95 request duration SLO (target: < 500ms)
+      # ---------------------------------------------------------------------------
+      - record: job:flask_http_request_duration_seconds:p95rate5m
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le, job) (
+              rate(flask_http_request_duration_seconds_bucket{job="demo-service"}[5m])
+            )
+          )
+
+      - alert: HighLatency
+        expr: job:flask_http_request_duration_seconds:p95rate5m > 0.5
+        for: 2m
+        labels:
+          severity: critical
+          signal: latency
+        annotations:
+          summary: "High latency on demo-service — p95 exceeds 500ms SLO"
+          description: "p95 request latency is {{ $value | humanizeDuration }} on demo-service. The SLO target is 500ms. Sustained breach will consume the error budget."
+          runbook_url: "__GITHUB_REPO_URL__/blob/main/runbooks/high_latency.md"
+
+      # ---------------------------------------------------------------------------
+      # Signal 2: ERRORS — 5xx error rate SLO (target: < 1% of requests)
+      # ---------------------------------------------------------------------------
+      - record: job:flask_http_request_error_ratio:rate5m
+        expr: |
+          sum(rate(flask_http_request_duration_seconds_count{job="demo-service", status=~"5.."}[5m]))
+          /
+          sum(rate(flask_http_request_duration_seconds_count{job="demo-service"}[5m]))
+
+      - alert: HighErrorRate
+        expr: job:flask_http_request_error_ratio:rate5m > 0.01
+        for: 2m
+        labels:
+          severity: critical
+          signal: errors
+        annotations:
+          summary: "High error rate on demo-service — exceeds 1% SLO threshold"
+          description: "5xx error rate is {{ $value | humanizePercentage }} on demo-service over the last 5 minutes. The SLO threshold is 1%. Investigate application logs immediately."
+          runbook_url: "__GITHUB_REPO_URL__/blob/main/runbooks/high_error_rate.md"
+
+      # ---------------------------------------------------------------------------
+      # Signal 3: SATURATION — memory utilisation (target: < 85%)
+      # ---------------------------------------------------------------------------
+      - record: job:demo_service_memory_saturation:pct
+        expr: |
+          (
+            process_resident_memory_bytes{job="demo-service"}
+            / node_memory_MemTotal_bytes
+          ) * 100
+
+      - alert: ServiceMemorySaturation
+        expr: job:demo_service_memory_saturation:pct > 85
+        for: 5m
+        labels:
+          severity: warning
+          signal: saturation
+        annotations:
+          summary: "demo-service memory saturation — RSS exceeds 85% of total RAM"
+          description: "demo-service RSS is {{ $value | printf \"%.1f\" }}% of total system memory. High saturation risks OOM kills and increased GC pressure."
+          runbook_url: "__GITHUB_REPO_URL__/blob/main/runbooks/service_memory_saturation.md"
+
+      # ---------------------------------------------------------------------------
+      # Signal 4: TRAFFIC — zero request rate (detects upstream/routing failure)
+      # ---------------------------------------------------------------------------
+      - alert: TrafficDrop
+        expr: |
+          sum(rate(flask_http_request_duration_seconds_count{job="demo-service"}[5m])) == 0
+        for: 5m
+        labels:
+          severity: warning
+          signal: traffic
+        annotations:
+          summary: "Zero traffic on demo-service — possible routing or upstream failure"
+          description: "demo-service has received zero requests for 5 minutes. This may indicate a load balancer misconfiguration, DNS failure, or upstream outage."
+          runbook_url: "__GITHUB_REPO_URL__/blob/main/runbooks/traffic_drop.md"

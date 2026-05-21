@@ -3,3 +3,20 @@ vm_host                  = "3.219.30.122"
 vm_user                  = "ubuntu"
 slack_webhook_url        = "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
 github_pat               = "ghp_your_token_here"
+github_repository        = "your-username/your-repo-name"
+
+# New dynamic parameters for fresh-server spin-up:
+slack_bot_name          = "vuln-bot"
+grafana_external_url    = "http://3.219.30.122:3000"
+prometheus_external_url = "http://3.219.30.122:9090"
+
+# Target probing endpoints for the Blackbox Exporter:
+blackbox_http_targets   = [
+  "https://vuln-watch.hng14.com",
+  "https://staging.vuln-watch.hng14.com"
+]
+
+blackbox_ssl_targets    = [
+  "vuln-watch.hng14.com:443",
+  "staging.vuln-watch.hng14.com:443"
+]

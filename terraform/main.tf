@@ -1,7 +1,5 @@
 # ============================================================================
 # main.tf — Deploys the vuln-observability stack onto the existing VM via SSH
-#
-# Robust, self-cleaning lifecycle edition.
 # ============================================================================
 
 terraform {
@@ -23,18 +21,22 @@ terraform {
 
 resource "null_resource" "deploy_observability_stack" {
 
-  # Triggers a redeployment if any system configuration variable changes
   triggers = {
     install_hash           = filemd5("${path.root}/../systemd/install.sh")
     github_repository_hash = var.github_repository
     github_pat_hash        = var.github_pat
     slack_webhook_url_hash = var.slack_webhook_url
+    slack_bot_name         = var.slack_bot_name
+    grafana_external_url   = var.grafana_external_url
+    prometheus_external_url = var.prometheus_external_url
+    blackbox_http_targets  = join(",", var.blackbox_http_targets)
+    blackbox_ssl_targets   = join(",", var.blackbox_ssl_targets)
     vm_host                = var.vm_host
     vm_user                = var.vm_user
     ssh_private_key_path   = var.ssh_private_key_path
   }
 
-  # ── Step 1: Package and scp the repo to the VM (runs on local Windows)
+  # ── Step 1: Package and scp the repo to the VM (runs on your Windows machine)
   provisioner "local-exec" {
     interpreter = ["PowerShell", "-NoProfile", "-Command"]
     command     = <<-PS
@@ -45,6 +47,7 @@ resource "null_resource" "deploy_observability_stack" {
         "--exclude=terraform/.terraform",
         "--exclude=terraform/terraform.tfstate",
         "--exclude=terraform/terraform.tfstate.backup",
+        "--exclude=terraform/tf-debug.log",
         "--exclude=terraform/*.log",
         "--exclude=terraform/*.tmp"
       )
@@ -76,24 +79,23 @@ resource "null_resource" "deploy_observability_stack" {
 
     inline = [
       "set -eu",
+      "echo '==> DIAG START' && id && uname -a && env | sort && echo '==> which:' && which tar && which bash && which sudo && echo '==> home:' && ls -la /home/${var.vm_user}/ && echo '==> DIAG END'",
       "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-      "echo '==> Installing base tools (tar) on remote host...' && export DEBIAN_FRONTEND=noninteractive && sudo apt-get update -y && sudo apt-get install -y tar",
-      "test -f /home/${self.triggers.vm_user}/deploy.tar.gz",
-      "rm -rf /home/${self.triggers.vm_user}/vuln-observability",
-      "mkdir -p /home/${self.triggers.vm_user}/vuln-observability",
-      "tar -xzf /home/${self.triggers.vm_user}/deploy.tar.gz -C /home/${self.triggers.vm_user}/vuln-observability",
-      "rm -f /home/${self.triggers.vm_user}/deploy.tar.gz",
-      
-      # Clean Windows CRLF line endings and UTF-8 BOMs to prevent installer crashes
-      "find /home/${self.triggers.vm_user}/vuln-observability -type f \\( -name '*.sh' -o -name '*.service' -o -name '*.yml' -o -name '*.yaml' \\) -print0 | xargs -0 sed -i 's/\\r$//'",
-      "find /home/${self.triggers.vm_user}/vuln-observability -type f -name '*.sh' -print0 | xargs -0 sed -i '1s/^\\xEF\\xBB\\xBF//'",
-      
-      "chmod +x /home/${self.triggers.vm_user}/vuln-observability/systemd/install.sh",
-      "echo '==> Running stack installer...' && cd /home/${self.triggers.vm_user}/vuln-observability && sudo SLACK_WEBHOOK_URL='${var.slack_webhook_url}' GITHUB_PAT='${var.github_pat}' GITHUB_REPOSITORY='${var.github_repository}' ./systemd/install.sh"
+      "echo '==> Installing base tools (tar) on remote host...' && export DEBIAN_FRONTEND=noninteractive && sudo timeout 900 apt-get update -y && sudo timeout 900 apt-get install -y tar",
+      "test -f /home/${var.vm_user}/deploy.tar.gz && ls -lh /home/${var.vm_user}/deploy.tar.gz",
+      "rm -rf /home/${var.vm_user}/vuln-observability",
+      "mkdir -p /home/${var.vm_user}/vuln-observability",
+      "tar -tzf /home/${var.vm_user}/deploy.tar.gz | head -n 20",
+      "tar -xzf /home/${var.vm_user}/deploy.tar.gz -C /home/${var.vm_user}/vuln-observability",
+      "rm -f /home/${var.vm_user}/deploy.tar.gz",
+      "find /home/${var.vm_user}/vuln-observability -type f \\( -name '*.sh' -o -name '*.service' -o -name '*.yml' -o -name '*.yaml' \\) -print0 | xargs -0 sed -i 's/\\r$//'",
+      "find /home/${var.vm_user}/vuln-observability -type f -name '*.sh' -print0 | xargs -0 sed -i '1s/^\\xEF\\xBB\\xBF//'",
+      "chmod +x /home/${var.vm_user}/vuln-observability/systemd/install.sh",
+      "echo '==> Running stack installer (max 30 minutes)...' && cd /home/${var.vm_user}/vuln-observability && sudo -E env VM_HOST='${var.vm_host}' SLACK_WEBHOOK_URL='${var.slack_webhook_url}' SLACK_BOT_NAME='${var.slack_bot_name}' GITHUB_PAT='${var.github_pat}' GITHUB_REPOSITORY='${var.github_repository}' GRAFANA_EXTERNAL_URL='${var.grafana_external_url}' PROMETHEUS_EXTERNAL_URL='${var.prometheus_external_url}' ALERTMANAGER_EXTERNAL_URL='http://${var.vm_host}:9093' BLACKBOX_HTTP_TARGETS='${join(",", var.blackbox_http_targets)}' BLACKBOX_SSL_TARGETS='${join(",", var.blackbox_ssl_targets)}' timeout 1800 bash -euxo pipefail systemd/install.sh 2>&1 | tee /home/${var.vm_user}/install.log"
     ]
   }
 
-  # ── Step 3: Cleanup on destroy (fully purges the observability stack from the VM)
+  # Step 3: Cleanup on destroy — stop and remove observability stack from VM
   provisioner "remote-exec" {
     when = destroy
 
@@ -115,7 +117,7 @@ resource "null_resource" "deploy_observability_stack" {
       "sudo systemctl daemon-reload",
       "sudo rm -rf /etc/prometheus /etc/loki /etc/tempo /etc/alertmanager /etc/otel-collector /etc/blackbox-exporter /etc/github-actions-exporter",
       "sudo rm -rf /var/lib/prometheus /var/lib/loki /var/lib/tempo /var/lib/alertmanager /var/lib/grafana/dashboards",
-      "sudo rm -rf /opt/demo-service \"/home/${self.triggers.vm_user}/vuln-observability\" \"/home/${self.triggers.vm_user}/deploy.tar.gz\"",
+      "sudo rm -rf /opt/demo-service \"$HOME/vuln-observability\" \"$HOME/install.log\" \"$HOME/deploy.tar.gz\"",
       "sudo systemctl stop grafana-server 2>/dev/null || true",
       "sudo systemctl disable grafana-server 2>/dev/null || true",
       "echo '==> Destroy cleanup complete.'"

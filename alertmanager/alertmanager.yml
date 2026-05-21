@@ -55,7 +55,7 @@ inhibit_rules:
 # in Alertmanager to prevent false positives in #DevOps-Alerts.
 #
 # Method 1: Via Alertmanager Web UI
-# 1. Access Alertmanager UI at http://3.219.30.122:9093/#/silences
+# 1. Access Alertmanager UI at __ALERTMANAGER_EXTERNAL_URL__/#/silences
 # 2. Click "New Silence"
 # 3. Add matchers (e.g., instance="localhost:8080" or job="demo-service")
 # 4. Set the duration and provide a clear comment (e.g., "Planned deploy maintenance")
@@ -75,7 +75,7 @@ receivers:
       - channel: "#DevOps-Alerts"
         send_resolved: true
         icon_emoji: ":rotating_light:"
-        username: "vuln-bot"
+        username: "__SLACK_BOT_NAME__"
         title: '{{ template "slack.vuln.title" . }}'
         color: '{{ template "slack.vuln.color" . }}'
         text: '{{ template "slack.vuln.text" . }}'

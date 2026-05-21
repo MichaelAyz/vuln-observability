@@ -11,6 +11,7 @@ ExecStart=/usr/local/bin/prometheus \
   --config.file=/etc/prometheus/prometheus.yml \
   --storage.tsdb.path=/var/lib/prometheus \
   --storage.tsdb.retention.time=15d \
+  --web.external-url=__PROMETHEUS_EXTERNAL_URL__ \
   --web.enable-lifecycle \
   --web.enable-admin-api \
   --web.listen-address=0.0.0.0:9090

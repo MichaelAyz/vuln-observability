@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# install.sh — Installs, configures, and starts the full vuln-observability
+# install.sh – Installs, configures, and starts the full vuln-observability
 # stack as native systemd services on Ubuntu.
 #
 # Usage:
@@ -11,8 +11,17 @@
 # ============================================================================
 set -euo pipefail
 
+TOTAL_STEPS=11
+CURRENT_STEP=0
+progress() {
+  CURRENT_STEP=$((CURRENT_STEP + 1))
+  local pct=$((CURRENT_STEP * 100 / TOTAL_STEPS))
+  echo ""
+  echo "==> [${CURRENT_STEP}/${TOTAL_STEPS}] (${pct}%) $1"
+}
+
 # ============================================================================
-# Section 0 — Strict mode and variables
+# Section 0 – Strict mode and variables
 # ============================================================================
 PROMETHEUS_VERSION=2.51.0
 LOKI_VERSION=2.9.5
@@ -21,7 +30,8 @@ NODE_EXPORTER_VERSION=1.7.0
 BLACKBOX_VERSION=0.24.0
 ALERTMANAGER_VERSION=0.27.0
 OTEL_VERSION=0.99.0
-GH_EXPORTER_VERSION=1.5.0
+GH_EXPORTER_VERSION=${GH_EXPORTER_VERSION:-}
+GH_EXPORTER_FAIL_REASON=""
 
 INSTALL_DIR=/usr/local/bin
 CONFIG_BASE=/etc
@@ -29,14 +39,37 @@ DATA_BASE=/var/lib
 REPO_DIR=$(pwd)
 
 SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-https://hooks.slack.com/services/PLACEHOLDER}
+SLACK_BOT_NAME=${SLACK_BOT_NAME:-vuln-bot}
 GITHUB_PAT=${GITHUB_PAT:-placeholder_token}
+GITHUB_REPOSITORY=${GITHUB_REPOSITORY:-}
+GITHUB_REPO_URL=${GITHUB_REPO_URL:-}
+VM_HOST=${VM_HOST:-}
+GRAFANA_EXTERNAL_URL=${GRAFANA_EXTERNAL_URL:-}
+PROMETHEUS_EXTERNAL_URL=${PROMETHEUS_EXTERNAL_URL:-}
+ALERTMANAGER_EXTERNAL_URL=${ALERTMANAGER_EXTERNAL_URL:-}
+BLACKBOX_HTTP_TARGETS=${BLACKBOX_HTTP_TARGETS:-}
+BLACKBOX_SSL_TARGETS=${BLACKBOX_SSL_TARGETS:-}
+
+if [ -z "${GRAFANA_EXTERNAL_URL}" ] && [ -n "${VM_HOST}" ]; then
+  GRAFANA_EXTERNAL_URL="http://${VM_HOST}:3000"
+fi
+if [ -z "${PROMETHEUS_EXTERNAL_URL}" ] && [ -n "${VM_HOST}" ]; then
+  PROMETHEUS_EXTERNAL_URL="http://${VM_HOST}:9090"
+fi
+if [ -z "${ALERTMANAGER_EXTERNAL_URL}" ] && [ -n "${VM_HOST}" ]; then
+  ALERTMANAGER_EXTERNAL_URL="http://${VM_HOST}:9093"
+fi
+if [ -z "${GITHUB_REPO_URL}" ] && [ -n "${GITHUB_REPOSITORY}" ]; then
+  GITHUB_REPO_URL="https://github.com/${GITHUB_REPOSITORY}"
+fi
 
 echo "==> Starting vuln-observability installation from: $REPO_DIR"
+echo "==> Progress tracking enabled (${TOTAL_STEPS} total steps)"
 
 # ============================================================================
-# Section 1 — System preparation
+# Section 1 – System preparation
 # ============================================================================
-echo "==> Preparing system..."
+progress "Preparing system packages and Grafana repo"
 apt-get update -y
 apt-get install -y curl wget tar unzip python3 python3-pip python3-venv adduser libfontconfig1 apt-transport-https software-properties-common
 
@@ -52,9 +85,9 @@ fi
 systemctl daemon-reload
 
 # ============================================================================
-# Section 2 — Create system users (idempotent)
+# Section 2 – Create system users (idempotent)
 # ============================================================================
-echo "==> Creating system users..."
+progress "Creating system users"
 for user in prometheus loki tempo node_exporter blackbox alertmanager otel ghexporter demoservice; do
   if ! id -u "$user" >/dev/null 2>&1; then
     useradd --system --no-create-home --shell /bin/false "$user"
@@ -63,23 +96,22 @@ for user in prometheus loki tempo node_exporter blackbox alertmanager otel ghexp
 done
 
 # ============================================================================
-# Section 3 — Create data and config directories
+# Section 3 – Create data and config directories
 # ============================================================================
-echo "==> Creating data and config directories..."
+progress "Creating data and config directories"
 for service in prometheus loki tempo alertmanager; do
   mkdir -p ${CONFIG_BASE}/${service}
   mkdir -p ${DATA_BASE}/${service}
 done
 
-# Prometheus rules subdirectory — required for cp -r in Section 5
 mkdir -p /etc/prometheus/rules
-
-# Alertmanager templates subdirectory — required for cp -r in Section 5
 mkdir -p /etc/alertmanager/templates
-
-# Grafana dashboards subdirectory
 mkdir -p /var/lib/grafana/dashboards
-
+mkdir -p /etc/grafana/provisioning/datasources
+mkdir -p /etc/grafana/provisioning/dashboards
+mkdir -p /etc/grafana/provisioning/notifiers
+mkdir -p /etc/grafana/provisioning/plugins
+mkdir -p /etc/grafana/provisioning/alerting
 mkdir -p ${CONFIG_BASE}/otel-collector
 mkdir -p ${CONFIG_BASE}/blackbox-exporter
 mkdir -p ${CONFIG_BASE}/github-actions-exporter
@@ -87,10 +119,9 @@ mkdir -p /var/log/demo-service
 mkdir -p /opt/demo-service
 
 # ============================================================================
-# Section 4 — Download and install binaries
+# Section 4 – Download and install binaries
 # ============================================================================
-echo "==> Downloading and installing binaries..."
-# Use /var/tmp (disk-backed) instead of /tmp (RAM tmpfs on small instances)
+progress "Downloading and installing binaries"
 TMP_DIR=$(mktemp -d -p /var/tmp)
 cd "$TMP_DIR"
 
@@ -173,42 +204,135 @@ if [ ! -f "${INSTALL_DIR}/otelcol-contrib" ]; then
     rm -f otelcol-contrib otelcol-contrib_${OTEL_VERSION}_linux_amd64.tar.gz
     echo "  [OK] otelcol-contrib installed"
   else
-    echo "  [WARN] Failed to download otelcol-contrib — otel-collector service will not start"
+    echo "  [WARN] Failed to download otelcol-contrib – otel-collector service will not start"
   fi
 fi
 
-# GitHub Actions Exporter — non-fatal, download may not exist for all versions
+# GitHub Actions Exporter – required for DORA dashboard
 if [ ! -f "${INSTALL_DIR}/github-actions-exporter" ]; then
-  echo "  Downloading GitHub Actions Exporter ${GH_EXPORTER_VERSION}..."
-  (
-    set +e
-    GH_URL="https://github.com/cpanato/github-actions-exporter/releases/download/v${GH_EXPORTER_VERSION}"
-    wget -q "${GH_URL}/github-actions-exporter_${GH_EXPORTER_VERSION}_Linux_x86_64.tar.gz" \
-      || wget -q "${GH_URL}/github-actions-exporter_${GH_EXPORTER_VERSION}_linux_amd64.tar.gz" \
-      || true
-    ARCHIVE=$(ls github-actions-exporter_*.tar.gz 2>/dev/null | head -1)
-    if [ -n "$ARCHIVE" ]; then
-      tar xf "$ARCHIVE"
-      BIN=$(ls github-actions-exporter github-actions-exporter_linux_amd64 2>/dev/null | head -1)
-      if [ -n "$BIN" ]; then
-        cp "$BIN" ${INSTALL_DIR}/github-actions-exporter
-        chmod 755 ${INSTALL_DIR}/github-actions-exporter
-        echo "  [OK] github-actions-exporter installed"
+  echo "  Downloading GitHub Actions Exporter..."
+  RELEASE_JSON=$(mktemp -p /var/tmp gha-release.XXXXXX.json)
+  if [ -n "${GH_EXPORTER_VERSION}" ]; then
+    API_URL="https://api.github.com/repos/Labbs/github-actions-exporter/releases/tags/v${GH_EXPORTER_VERSION}"
+    if ! curl -fsSL "$API_URL" -o "$RELEASE_JSON"; then
+      echo "  [WARN] Tag v${GH_EXPORTER_VERSION} not found; falling back to latest release."
+      API_URL="https://api.github.com/repos/Labbs/github-actions-exporter/releases/latest"
+      if ! curl -fsSL "$API_URL" -o "$RELEASE_JSON"; then
+        GH_EXPORTER_FAIL_REASON="release metadata request failed (${API_URL})"
+        echo "  [FATAL] Installation failed: github-actions-exporter ${GH_EXPORTER_FAIL_REASON}"
+        rm -f "$RELEASE_JSON"
+        exit 1
       fi
-      rm -f "$ARCHIVE" github-actions-exporter github-actions-exporter_linux_amd64
-    else
-      echo "  [WARN] github-actions-exporter v${GH_EXPORTER_VERSION} not found — DORA metrics will be unavailable"
     fi
-  )
+  else
+    API_URL="https://api.github.com/repos/Labbs/github-actions-exporter/releases/latest"
+    if ! curl -fsSL "$API_URL" -o "$RELEASE_JSON"; then
+      GH_EXPORTER_FAIL_REASON="release metadata request failed (${API_URL})"
+      echo "  [FATAL] Installation failed: github-actions-exporter ${GH_EXPORTER_FAIL_REASON}"
+      rm -f "$RELEASE_JSON"
+      exit 1
+    fi
+  fi
+
+  ASSET_URL=$(
+    python3 - "$RELEASE_JSON" <<'PY'
+import json, re, sys
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    data = json.load(f)
+assets = data.get("assets", [])
+
+# Priority order: prefer named archive with OS/arch, then bare binary.
+# Explicitly skip checksum files (.md5, .sha256, .sha512, etc.).
+patterns = [
+    re.compile(r"linux.*(amd64|x86_64|x64).*\.(tar\.gz|tgz|zip)$", re.I),
+    re.compile(r"linux.*(amd64|x86_64|x64)$", re.I),
+    # FIX: v1.9.0 ships a single raw binary named exactly "github-actions-exporter"
+    # with no OS/arch suffix and no archive extension. Match it directly,
+    # but exclude checksum sidecar files (.md5, .sha256, .sha512, etc.).
+    re.compile(r"^github-actions-exporter$", re.I),
+]
+CHECKSUM_SUFFIXES = (".md5", ".sha256", ".sha512", ".sha1", ".asc", ".sig")
+
+for p in patterns:
+    for a in assets:
+        name = a.get("name", "")
+        url  = a.get("browser_download_url", "")
+        if any(name.lower().endswith(s) for s in CHECKSUM_SUFFIXES):
+            continue
+        if p.search(name) and url:
+            print(url)
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+  ) || true
+
+  rm -f "$RELEASE_JSON"
+  if [ -z "$ASSET_URL" ]; then
+    GH_EXPORTER_FAIL_REASON="no Linux amd64/x64 release asset found"
+    echo "  [FATAL] Installation failed: github-actions-exporter ${GH_EXPORTER_FAIL_REASON}"
+    echo "  [ERROR] No Linux amd64 exporter asset found in Labbs/github-actions-exporter releases."
+    exit 1
+  fi
+
+  ARCHIVE=$(basename "$ASSET_URL")
+  EXTRACT_DIR=$(mktemp -d -p /var/tmp gha-exporter.XXXXXX)
+  echo "  [INFO] github-actions-exporter asset selected: $ASSET_URL"
+
+  if ! curl -fL "$ASSET_URL" -o "$ARCHIVE"; then
+    GH_EXPORTER_FAIL_REASON="asset download failed (${ASSET_URL})"
+    echo "  [FATAL] Installation failed: github-actions-exporter ${GH_EXPORTER_FAIL_REASON}"
+    rm -f "$ARCHIVE"
+    rm -rf "$EXTRACT_DIR"
+    exit 1
+  fi
+
+  case "$ARCHIVE" in
+    *.zip)
+      unzip -q "$ARCHIVE" -d "$EXTRACT_DIR" || {
+        GH_EXPORTER_FAIL_REASON="invalid zip archive ($ARCHIVE)"
+        echo "  [FATAL] Installation failed: github-actions-exporter ${GH_EXPORTER_FAIL_REASON}"
+        rm -f "$ARCHIVE"; rm -rf "$EXTRACT_DIR"; exit 1
+      }
+      BIN_PATH=$(find "$EXTRACT_DIR" -type f \( -name "github-actions-exporter" -o -name "github-actions-exporter_*" \) | head -1 || true)
+      ;;
+    *.tar.gz|*.tgz)
+      tar xf "$ARCHIVE" -C "$EXTRACT_DIR" || {
+        GH_EXPORTER_FAIL_REASON="invalid tar archive ($ARCHIVE)"
+        echo "  [FATAL] Installation failed: github-actions-exporter ${GH_EXPORTER_FAIL_REASON}"
+        rm -f "$ARCHIVE"; rm -rf "$EXTRACT_DIR"; exit 1
+      }
+      BIN_PATH=$(find "$EXTRACT_DIR" -type f \( -name "github-actions-exporter" -o -name "github-actions-exporter_*" \) | head -1 || true)
+      ;;
+    *)
+      # FIX: Raw binary asset (e.g. v1.9.0) – no extraction needed.
+      # The downloaded file IS the binary; set BIN_PATH directly instead
+      # of searching an empty EXTRACT_DIR (which would always fail).
+      BIN_PATH="$ARCHIVE"
+      ;;
+  esac
+
+  if [ -z "$BIN_PATH" ]; then
+    GH_EXPORTER_FAIL_REASON="binary not found in downloaded asset ($ARCHIVE)"
+    echo "  [FATAL] Installation failed: github-actions-exporter ${GH_EXPORTER_FAIL_REASON}"
+    rm -f "$ARCHIVE"
+    rm -rf "$EXTRACT_DIR"
+    exit 1
+  fi
+
+  cp "$BIN_PATH" "${INSTALL_DIR}/github-actions-exporter"
+  chmod 755 "${INSTALL_DIR}/github-actions-exporter"
+  rm -f "$ARCHIVE"
+  rm -rf "$EXTRACT_DIR"
+  echo "  [OK] github-actions-exporter installed"
 fi
 
 cd "$REPO_DIR"
 rm -rf "$TMP_DIR"
 
 # ============================================================================
-# Section 5 — Copy config files from repo to system paths
+# Section 5 – Copy config files from repo to system paths
 # ============================================================================
-echo "==> Copying configuration files..."
+progress "Copying configuration files"
 cp "${REPO_DIR}/prometheus/prometheus.yml"            /etc/prometheus/prometheus.yml
 cp "${REPO_DIR}/prometheus/blackbox.yml"              /etc/blackbox-exporter/config.yml
 cp -r "${REPO_DIR}/prometheus/rules/."               /etc/prometheus/rules/
@@ -231,21 +355,69 @@ chown -R ghexporter:ghexporter /etc/github-actions-exporter
 chown -R grafana:grafana       /etc/grafana /var/lib/grafana
 
 # ============================================================================
-# Section 6 — Substitute environment variables in configs
+# Section 6 – Substitute environment variables in configs
 # ============================================================================
-echo "==> Substituting environment variables..."
+progress "Substituting environment variables"
 
-# Replace the entire placeholder webhook URL with the real one
 sed -i "s|https://hooks.slack.com/services/PLACEHOLDER|${SLACK_WEBHOOK_URL}|g" /etc/alertmanager/alertmanager.yml
+sed -i "s|__SLACK_BOT_NAME__|${SLACK_BOT_NAME}|g" /etc/alertmanager/alertmanager.yml
+sed -i "s|__GRAFANA_EXTERNAL_URL__|${GRAFANA_EXTERNAL_URL}|g" /etc/alertmanager/templates/slack.tmpl
+sed -i "s|__ALERTMANAGER_EXTERNAL_URL__|${ALERTMANAGER_EXTERNAL_URL}|g" /etc/alertmanager/alertmanager.yml
+sed -i "s|__GITHUB_REPO_URL__|${GITHUB_REPO_URL}|g" /etc/prometheus/rules/*.yml
+sed -i "s|__VM_HOST__|${VM_HOST}|g" /etc/prometheus/prometheus.yml
+
+if [ -n "${BLACKBOX_HTTP_TARGETS}" ] && [ -n "${BLACKBOX_SSL_TARGETS}" ]; then
+  echo "==> Rendering blackbox targets from deploy variables..."
+  export BLACKBOX_HTTP_TARGETS BLACKBOX_SSL_TARGETS
+  python3 - <<'PY'
+import os
+import re
+
+path = "/etc/prometheus/prometheus.yml"
+http_targets = [x.strip() for x in os.environ.get("BLACKBOX_HTTP_TARGETS", "").split(",") if x.strip()]
+ssl_targets = [x.strip() for x in os.environ.get("BLACKBOX_SSL_TARGETS", "").split(",") if x.strip()]
+
+with open(path, "r", encoding="utf-8") as f:
+    text = f.read()
+
+def build_block(items):
+    return "\n".join([f"          - {item}" for item in items])
+
+http_block = build_block(http_targets)
+ssl_block = build_block(ssl_targets)
+
+text, n1 = re.subn(
+    r"(?ms)([ \t]*# BLACKBOX_HTTP_TARGETS_START\n).*?([ \t]*# BLACKBOX_HTTP_TARGETS_END)",
+    r"\1" + http_block + "\n" + r"\2",
+    text,
+)
+text, n2 = re.subn(
+    r"(?ms)([ \t]*# BLACKBOX_SSL_TARGETS_START\n).*?([ \t]*# BLACKBOX_SSL_TARGETS_END)",
+    r"\1" + ssl_block + "\n" + r"\2",
+    text,
+)
+
+if n1 != 1 or n2 != 1:
+    raise SystemExit("Failed to render blackbox target blocks in prometheus.yml")
+
+with open(path, "w", encoding="utf-8") as f:
+    f.write(text)
+PY
+fi
+
+if [ -n "${VM_HOST}" ]; then
+  echo "==> Rewriting hardcoded host references to VM_HOST=${VM_HOST}..."
+  sed -i "s|3\.219\.30\.122|${VM_HOST}|g; s|3\.239\.26\.39|${VM_HOST}|g" /etc/alertmanager/alertmanager.yml || true
+  sed -i "s|3\.219\.30\.122|${VM_HOST}|g; s|3\.239\.26\.39|${VM_HOST}|g" /etc/alertmanager/templates/slack.tmpl || true
+fi
 
 # ============================================================================
-# Section 7 — Install and configure demo service
+# Section 7 – Install and configure demo service
 # ============================================================================
-echo "==> Installing demo service..."
+progress "Installing demo service"
 cp "${REPO_DIR}/demo-service/app.py"           /opt/demo-service/
 cp "${REPO_DIR}/demo-service/requirements.txt" /opt/demo-service/
 
-# Recreate venv if requirements changed (delete old venv to pick up new protobuf)
 if [ ! -d /opt/demo-service/venv ]; then
   python3 -m venv /opt/demo-service/venv
 fi
@@ -254,49 +426,53 @@ fi
 chown -R demoservice:demoservice /opt/demo-service
 
 # ============================================================================
-# Section 8 — Install systemd unit files
+# Section 8 – Install systemd unit files
 # ============================================================================
-echo "==> Installing systemd unit files..."
+progress "Installing systemd unit files"
 cp "${REPO_DIR}/systemd/"*.service /etc/systemd/system/
 
-# Create the github-actions-exporter env file automatically
-if [ "${GITHUB_PAT}" != "placeholder_token" ]; then
-  {
-    echo "GITHUB_TOKEN=${GITHUB_PAT}"
-    echo "GITHUB_REPOS=${GITHUB_REPOSITORY}"
-    echo "GITHUB_REPOSITORY=${GITHUB_REPOSITORY}"
-    echo "PORT=9999"
-  } > /etc/github-actions-exporter/env
-  chmod 600 /etc/github-actions-exporter/env
-  chown ghexporter:ghexporter /etc/github-actions-exporter/env
+# FIX: This sed must run AFTER the service files are copied above.
+# Previously it was in Section 6 before the cp, causing the script to
+# exit immediately under set -euo pipefail with "No such file or directory".
+sed -i "s|__PROMETHEUS_EXTERNAL_URL__|${PROMETHEUS_EXTERNAL_URL}|g" /etc/systemd/system/prometheus.service
+
+if [ "${GITHUB_PAT}" = "placeholder_token" ] || [ -z "${GITHUB_REPOSITORY}" ]; then
+  GH_EXPORTER_FAIL_REASON="missing required env (GITHUB_PAT or GITHUB_REPOSITORY)"
+  echo "  [FATAL] Installation failed: github-actions-exporter ${GH_EXPORTER_FAIL_REASON}"
+  echo "  [ERROR] github-actions-exporter requires both GITHUB_PAT and GITHUB_REPOSITORY."
+  exit 1
 fi
+
+{
+  echo "GITHUB_TOKEN=${GITHUB_PAT}"
+  echo "GITHUB_REPOS=${GITHUB_REPOSITORY}"
+  echo "GITHUB_REPOSITORY=${GITHUB_REPOSITORY}"
+  echo "PORT=9999"
+} > /etc/github-actions-exporter/env
+chmod 600 /etc/github-actions-exporter/env
+chown ghexporter:ghexporter /etc/github-actions-exporter/env
 
 systemctl daemon-reload
 
 # ============================================================================
-# Section 9 — Enable and start all services
+# Section 9 – Enable and start all services
 # ============================================================================
-echo "==> Enabling and starting services..."
+progress "Enabling and starting services"
 
 SERVICES="grafana-server prometheus loki tempo node-exporter blackbox-exporter alertmanager otel-collector github-actions-exporter demo-service"
 
 for srv in $SERVICES; do
   systemctl enable "$srv" || echo "  [WARN] Could not enable $srv"
-  systemctl restart "$srv" || echo "  [WARN] Could not start $srv — check: journalctl -u $srv -n 20"
+  systemctl restart "$srv" || echo "  [WARN] Could not start $srv – check: journalctl -u $srv -n 20"
 done
 
-echo "==> Note on Grafana Authentication:"
-# By design, Grafana uses admin/admin for the initial login. 
-# We do not use grafana-cli admin reset-admin-password here because the 
-# SQLite DB initialization takes 5-15 seconds after the service starts, 
-# and running it immediately will cause set -e to abort the script.
-
 # ============================================================================
-# Section 10 — Health verification
+# Section 10 – Health verification
 # ============================================================================
-echo "==> Waiting 10 seconds for services to initialize..."
+progress "Waiting for services to initialize"
 sleep 10
 
+progress "Verifying health and printing access URLs"
 echo ""
 echo "==> Service Health Verification:"
 ALL_OK=true
@@ -305,7 +481,7 @@ for srv in $SERVICES; do
   if [ "$STATUS" = "active" ]; then
     echo "  [ OK ] $srv"
   else
-    echo "  [FAIL] $srv ($STATUS) — run: journalctl -u $srv -n 30 --no-pager"
+    echo "  [FAIL] $srv ($STATUS) – run: journalctl -u $srv -n 30 --no-pager"
     ALL_OK=false
   fi
 done
@@ -313,23 +489,28 @@ done
 echo ""
 
 # ============================================================================
-# Section 11 — Print access URLs
+# Section 11 – Print access URLs
 # ============================================================================
-cat << 'EOF'
+SERVER_IP=$(curl -sf --max-time 5 ifconfig.me || curl -sf --max-time 5 icanhazip.com || echo "<server-ip>")
+
+cat << EOF
 ========================================
-Vuln Observability Stack — Access URLs
+Vuln Observability Stack – Access URLs
 ========================================
-Grafana:       http://3.219.30.122:3000  (admin/admin)
-Prometheus:    http://3.219.30.122:9090
-Alertmanager:  http://3.219.30.122:9093
-Loki:          http://3.219.30.122:3100
-Tempo:         http://3.219.30.122:3200
-Demo Service:  http://3.219.30.122:8080
+Grafana:       http://${SERVER_IP}:3000  (admin/admin)
+Prometheus:    http://${SERVER_IP}:9090
+Alertmanager:  http://${SERVER_IP}:9093
+Loki:          http://${SERVER_IP}:3100
+Tempo:         http://${SERVER_IP}:3200
+Demo Service:  http://${SERVER_IP}:8080
 ========================================
 EOF
 
 if [ "$ALL_OK" = "false" ]; then
   echo "[NOTE] Some services failed. Use the journalctl commands above to diagnose each one."
 fi
+
+echo ""
+echo "==> Installation progress: 100% complete"
 
 exit 0

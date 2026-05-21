@@ -29,7 +29,7 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9100"]
         labels:
-          instance: "3.219.30.122"
+          instance: "__VM_HOST__"
           env: "production"
 
   # HTTP/SSL probing — Blackbox Exporter
@@ -39,8 +39,10 @@ scrape_configs:
       module: [http_2xx]
     static_configs:
       - targets:
+          # BLACKBOX_HTTP_TARGETS_START
           - https://vuln-watch.hng14.com
           - https://staging.vuln-watch.hng14.com
+          # BLACKBOX_HTTP_TARGETS_END
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -56,8 +58,10 @@ scrape_configs:
       module: [tcp_connect]
     static_configs:
       - targets:
+          # BLACKBOX_SSL_TARGETS_START
           - vuln-watch.hng14.com:443
           - staging.vuln-watch.hng14.com:443
+          # BLACKBOX_SSL_TARGETS_END
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

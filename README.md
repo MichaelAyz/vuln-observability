@@ -17,12 +17,20 @@ git clone https://github.com/MichaelAyz/vuln-observability.git
 cd vuln-observability
 ```
 
-### 2. Configure Secrets
-We must never commit live secrets to git. Copy the HCL example to create your local variables file:
+### 2. Configure Variables & Secrets
+We must never commit live secrets or environment-specific values to git. Copy the HCL example to create your local variables file:
 ```bash
 cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 ```
-Open `terraform/terraform.tfvars` and edit it with your real SSH key path, target IP, Slack webhook, and GitHub PAT. This file is git-ignored.
+Open `terraform/terraform.tfvars` and edit it. 
+
+Configure the following fields:
+*   **Infrastructure Keys & Hosts:** SSH private key path, remote host IP (`vm_host`), and SSH user.
+*   **Secrets:** Slack Incoming Webhook URL and GitHub Personal Access Token (`github_pat`).
+*   **Dynamic Telemetry Domains:** The external URLs for your Grafana (`grafana_external_url`) and Prometheus (`prometheus_external_url`) consoles. Ensure these match your `vm_host` IP.
+*   **Blackbox Probe Targets:** Specify the list of HTTP (`blackbox_http_targets`) and SSL (`blackbox_ssl_targets`) endpoints to monitor.
+
+This file is git-ignored to prevent accidental commits.
 
 ### 3. Deploy
 ```bash
@@ -30,7 +38,8 @@ cd terraform
 terraform init
 terraform apply -auto-approve
 ```
-That's it! Terraform will securely rsync the configuration and remotely provision the entire stack.
+That's it! Terraform will package the repository, automatically strip Windows CRLF line endings/UTF-8 BOMs, copy the package, and remotely provision the entire stack dynamically.
+
 
 ---
 
@@ -143,14 +152,19 @@ All 9 core components run as native systemd services on the production server. E
 | `demo-service.service` | OpenTelemetry Instrumented App | `8080` | `always` (5s delay) | `active (running)` |
 | `github-actions-exporter.service`| GitHub Actions DORA Exporter | `9999` | `always` (5s delay) | `active (running)` |
 
-## Error Budget Policy Summary
+## Error Budget & Application SLOs Policy
 
-Reliability is managed through strict Error Budgets:
-- **Availability SLO:** 99.5% uptime (measured via Blackbox probes). Provides an Error Budget of ~216 minutes/month.
-- **Latency SLO:** 95% of requests complete under 500ms.
-- **Action Thresholds:**
-  - **> 50% Budget Consumed:** Slowdown non-critical feature work and trigger reliability review.
-  - **100% Budget Consumed:** Feature freeze enacted. Mandatory Post-Incident Review (PIR) and reliability sprint required before shipping new features.
+System and application reliability are managed through strict Service Level Objectives (SLOs) and Error Budgets:
+1.  **Availability (Platform SLO):** 99.5% uptime (measured via Blackbox probes). Provides a monthly availability Error Budget of ~216 minutes.
+2.  **Latency (Application SLO):** 95% of requests complete under 500ms (p95 threshold of `demo-service`).
+3.  **Errors (Application SLO):** 5xx error rate is restricted to < 1.0% of requests.
+4.  **Saturation (System SLO):** Memory utilization (Resident Set Size) must stay under 85% of total RAM.
+5.  **Traffic (routing SLO):** Sustained 0-traffic drop (5m window) triggers alert to identify routing/ingress failures.
+
+### Action Thresholds & Escalations:
+*   **> 50% Budget Consumed:** Slow down non-critical feature work and trigger a reliability architecture review.
+*   **100% Budget Consumed:** Feature freeze enacted. Mandatory Post-Incident Review (PIR) and reliability sprint required before shipping new features.
+
 
 ## Dashboard Guide
 
