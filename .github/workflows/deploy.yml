@@ -27,5 +27,4 @@ jobs:
         run: |
           echo "Deploying to production environment..."
           # To fail the second push, uncomment the line below:
-          #exit 1
-          a
+          #exit 
